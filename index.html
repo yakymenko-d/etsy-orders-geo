@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Карта замовлень Etsy</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+<style>
+  :root {
+    --glass:rgba(255,255,255,.84); --solid:#fff; --fg:#1c1b1a; --muted:#6b6560; --line:rgba(0,0,0,.09); --hover:rgba(0,0,0,.05);
+    --accent:#f1641e; --accent2:#ff9a3c; --accent-soft:rgba(241,100,30,.13); --danger:#e5484d;
+    --shadow:0 8px 30px rgba(20,16,12,.16), 0 1px 3px rgba(20,16,12,.1);
+    --r:18px;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:#e8e4de; font:14px/1.45 ui-sans-serif,-apple-system,"SF Pro Text","Segoe UI",Roboto,Inter,sans-serif; color:var(--fg); -webkit-font-smoothing:antialiased; overflow:hidden; }
+  #map { position:absolute; inset:0; background:#e8e4de; }
+  .glass { background:var(--glass); backdrop-filter:blur(18px) saturate(1.5); -webkit-backdrop-filter:blur(18px) saturate(1.5); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); }
+  button { font:inherit; color:inherit; }
+  .ib { border:0; background:transparent; width:32px; height:32px; border-radius:10px; cursor:pointer; display:grid; place-items:center; color:var(--muted); font-size:15px; flex:none; transition:background .15s, color .15s; }
+  .ib:hover { background:var(--hover); color:var(--fg); }
+  .ib.off { opacity:.4; }
+  .ib.on { background:var(--accent-soft); color:var(--accent); }
+
+  /* ---------- left column ---------- */
+  #left { position:absolute; top:14px; left:14px; z-index:1000; width:min(372px, calc(100vw - 28px)); max-height:calc(100% - 140px); display:flex; flex-direction:column; gap:10px; pointer-events:none; }
+  #left > * { pointer-events:auto; }
+  #shopsCard { padding:10px 8px 8px; flex:none; }
+  .sh-head { display:flex; align-items:center; justify-content:space-between; padding:2px 8px 6px; }
+  .sh-head b { font-size:15px; letter-spacing:-.01em; }
+  #shopList { max-height:236px; overflow:auto; display:flex; flex-direction:column; gap:2px; }
+  .shop { display:flex; align-items:center; gap:10px; padding:7px 6px 7px 8px; border-radius:13px; cursor:pointer; border:1.5px solid transparent; }
+  .shop:hover { background:var(--hover); }
+  .shop.active { border-color:var(--c); background:color-mix(in srgb, var(--c) 10%, transparent); }
+  .av { width:38px; height:38px; border-radius:12px; flex:none; object-fit:cover; background:var(--c); color:#fff; display:grid; place-items:center; font-weight:800; font-size:18px; box-shadow:0 3px 10px color-mix(in srgb, var(--c) 45%, transparent); }
+  .shop .t { flex:1; min-width:0; }
+  .shop .n { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.01em; }
+  .shop .s { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .shop .dotc { width:9px; height:9px; border-radius:50%; background:var(--c); display:inline-block; margin-right:5px; }
+  .shop .acts { display:flex; gap:0; flex:none; }
+  .shop .acts .ib { width:30px; height:30px; }
+  .shop .acts .ib:hover { color:var(--c); }
+
+  #kpis { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.75fr) minmax(0,.8fr) minmax(0,1.45fr); gap:8px; flex:none; }
+  .kpi { padding:10px 6px; text-align:center; border-radius:14px; min-width:0; }
+  .kpi b { display:block; font-size:17px; letter-spacing:-.02em; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .kpi span { display:block; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  #search { display:flex; align-items:center; gap:8px; padding:6px 6px 6px 14px; flex:none; }
+  #search input { flex:1; min-width:0; border:0; outline:0; background:transparent; color:var(--fg); font-size:15px; padding:8px 0; }
+  #search input::placeholder { color:var(--muted); }
+  #toggleFilters { position:relative; }
+  #toggleFilters.active::after { content:""; position:absolute; top:5px; right:5px; width:9px; height:9px; border-radius:50%; background:var(--accent); border:2px solid var(--solid); }
+  #filtersCard { padding:14px; overflow:auto; display:none; min-height:0; }
+  #filtersCard.open { display:block; }
+  #customRange input { flex:1; min-width:0; padding:7px 9px; border-radius:10px; border:1px solid var(--line); background:transparent; color:var(--fg); font:inherit; font-size:13px; }
+  .lbl { font-size:11px; color:var(--muted); margin:14px 0 8px; text-transform:uppercase; letter-spacing:.07em; font-weight:600; }
+  .lbl:first-child { margin-top:0; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { border:1px solid var(--line); background:transparent; padding:5px 12px; border-radius:99px; cursor:pointer; font-size:13px; transition:all .15s; }
+  .chip:hover { background:var(--hover); }
+  .chip.on { background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .chip small { opacity:.65; margin-left:5px; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .link { border:0; background:none; color:var(--accent); cursor:pointer; padding:0; font-weight:600; font-size:13px; }
+  .link.danger { color:var(--danger); }
+  .file-row { display:flex; gap:8px; flex-wrap:nowrap; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+  #uploadBtn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #clear { flex:none; white-space:nowrap; }
+  .btn { border:1px solid var(--line); background:transparent; padding:7px 13px; border-radius:11px; cursor:pointer; font-size:13px; font-weight:550; transition:background .15s; }
+  .btn:hover { background:var(--hover); }
+  .btn.primary { background:linear-gradient(135deg,var(--accent2),var(--accent)); border:0; color:#fff; }
+
+  /* ---------- top right ---------- */
+  #topright { position:absolute; top:14px; right:14px; z-index:1000; display:flex; gap:8px; align-items:flex-start; }
+  #topright > .glass { display:flex; padding:4px; border-radius:14px; gap:2px; }
+  #view button { border:0; background:transparent; padding:0 14px; height:34px; border-radius:10px; cursor:pointer; font-weight:600; font-size:13px; color:var(--muted); }
+  #view button.on { background:linear-gradient(135deg,var(--accent2),var(--accent)); color:#fff; }
+  #topright .ib { width:34px; height:34px; }
+  #exportWrap { position:relative; }
+  #exportMenu { position:absolute; right:0; top:44px; width:230px; padding:6px; display:none; flex-direction:column; border-radius:14px; }
+  #exportMenu.open { display:flex; }
+  #exportMenu button { border:0; background:transparent; text-align:left; padding:9px 10px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:550; }
+  #exportMenu button:hover { background:var(--hover); }
+  #exportMenu small { display:block; color:var(--muted); font-weight:400; }
+
+  /* ---------- bottom left: base layer + display mode ---------- */
+  #bl { position:absolute; left:14px; bottom:26px; z-index:1000; display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
+  .seg { display:flex; padding:4px; gap:2px; border-radius:14px; }
+  .seg button { border:0; background:transparent; padding:7px 12px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600; color:var(--muted); white-space:nowrap; }
+  .seg button.on { background:var(--accent-soft); color:var(--accent); }
+
+  /* ---------- right sheet (place orders / statistics) ---------- */
+  #sheet { position:absolute; z-index:1100; top:66px; right:14px; width:min(420px, calc(100vw - 28px)); max-height:calc(100% - 150px); display:flex; flex-direction:column; overflow:hidden; opacity:0; transform:translateX(24px) scale(.98); pointer-events:none; transition:opacity .22s, transform .22s; border-radius:22px; }
+  #sheet.open { opacity:1; transform:none; pointer-events:auto; }
+  .m-head { padding:18px 18px 14px; display:flex; gap:12px; align-items:flex-start; background:linear-gradient(160deg,color-mix(in srgb, var(--c) 18%, transparent),transparent 70%); flex:none; }
+  .m-pin { width:42px; height:42px; border-radius:14px; background:var(--c); color:#fff; display:grid; place-items:center; font-size:20px; flex:none; box-shadow:0 4px 12px color-mix(in srgb, var(--c) 45%, transparent); }
+  .m-title { font-size:20px; font-weight:780; letter-spacing:-.02em; line-height:1.2; }
+  .m-sub { color:var(--muted); font-size:13px; }
+  .m-shop { display:inline-flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; font-weight:650; padding:3px 10px 3px 4px; border-radius:99px; background:color-mix(in srgb, var(--c) 14%, transparent); }
+  .m-shop .av { width:18px; height:18px; border-radius:6px; font-size:10px; box-shadow:none; }
+  .m-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:0 18px 14px; flex:none; }
+  .m-stat { background:var(--hover); border-radius:12px; padding:8px 10px; min-width:0; }
+  .m-stat b { display:block; font-size:15px; letter-spacing:-.01em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .m-stat span { display:block; font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .m-list { overflow:auto; padding:4px 10px 14px; border-top:1px solid var(--line); }
+  .m-h { padding:12px 8px 6px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; font-weight:600; }
+  .order { display:flex; gap:12px; padding:10px 8px; border-radius:12px; align-items:flex-start; }
+  .order:hover { background:var(--hover); }
+  .order .ic { width:34px; height:34px; border-radius:10px; background:color-mix(in srgb, var(--c) 16%, transparent); display:grid; place-items:center; flex:none; font-size:15px; }
+  .order .mid { flex:1; min-width:0; }
+  .order .tt { font-weight:620; overflow-wrap:anywhere; }
+  .order .tt a, .rk a { color:inherit; text-decoration:none; border-bottom:1px dotted var(--muted); }
+  .order .tt a:hover, .rk a:hover { color:var(--c, var(--accent)); border-bottom-color:var(--c, var(--accent)); }
+  .order .mm { color:var(--muted); font-size:12.5px; overflow-wrap:anywhere; }
+  .order .pr { font-weight:700; white-space:nowrap; }
+  .badge { display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:99px; background:color-mix(in srgb, var(--c, var(--accent)) 16%, transparent); color:var(--c, var(--accent)); margin-left:4px; white-space:nowrap; }
+  .empty { color:var(--muted); padding:16px 8px; text-align:center; }
+
+  /* stats */
+  .st-body { overflow:auto; padding:0 16px 16px; }
+  .st-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .tl { margin-top:14px; }
+  .tl-bars { display:flex; align-items:flex-end; gap:2px; height:70px; padding-top:4px; }
+  .tl-bars div { flex:1; min-width:3px; background:color-mix(in srgb, var(--muted) 35%, transparent); border-radius:3px 3px 0 0; cursor:pointer; transition:background .15s; }
+  .tl-bars div.in { background:linear-gradient(180deg,var(--accent2),var(--accent)); }
+  .tl-bars div:hover { outline:2px solid var(--accent); }
+  .tl-axis { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:4px; }
+  .tabs { display:flex; gap:4px; margin:16px 0 6px; background:var(--hover); padding:3px; border-radius:12px; }
+  .tabs button { flex:1; border:0; background:transparent; padding:6px 4px; border-radius:9px; cursor:pointer; font-size:12.5px; font-weight:600; color:var(--muted); }
+  .tabs button.on { background:var(--solid); color:var(--fg); box-shadow:0 1px 3px rgba(0,0,0,.12); }
+  .rk { position:relative; display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; cursor:pointer; overflow:hidden; }
+  .rk:hover { background:var(--hover); }
+  .rk .bar { position:absolute; left:0; top:0; bottom:0; background:var(--accent-soft); border-radius:10px; z-index:-1; }
+  .rk .no { width:20px; color:var(--muted); font-size:12px; font-weight:700; flex:none; }
+  .rk .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  .rk .nm small { color:var(--muted); font-weight:400; margin-left:4px; }
+  .rk .vl { font-weight:700; white-space:nowrap; font-size:13px; }
+  .rk .vl small { color:var(--muted); font-weight:500; margin-left:6px; }
+  .rk-list { position:relative; z-index:0; }
+
+  /* ---------- shop dialog ---------- */
+  #dlg { position:absolute; inset:0; z-index:1300; display:none; place-items:center; background:rgba(0,0,0,.35); backdrop-filter:blur(3px); }
+  #dlg.open { display:grid; }
+  #dlg .box { width:min(400px, calc(100vw - 28px)); max-height:calc(100% - 28px); overflow:auto; padding:22px; background:var(--solid); border-radius:22px; box-shadow:var(--shadow); }
+  #dlg h3 { margin:0 0 16px; font-size:18px; }
+  #dlg label.f { font-size:12px; color:var(--muted); display:block; margin-bottom:5px; }
+  #dlg input[type=text] { width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:transparent; color:var(--fg); font-size:15px; }
+  #dlg .logo-row { display:flex; align-items:center; gap:12px; margin:16px 0; }
+  #dlg .logo-row .av { width:52px; height:52px; border-radius:16px; font-size:24px; }
+  #dlg .hint { font-size:12px; color:var(--muted); margin:5px 0 16px; }
+  .swatches { display:flex; gap:8px; margin:6px 0 18px; flex-wrap:wrap; }
+  .sw { width:28px; height:28px; border-radius:50%; border:3px solid transparent; background:var(--c); cursor:pointer; outline:1px solid var(--line); }
+  .sw.on { border-color:var(--solid); outline:2px solid var(--c); }
+  .sw.custom { position:relative; background:conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); overflow:hidden; display:block; }
+  .sw.custom.has { background:var(--c); }
+  .sw.custom input { position:absolute; inset:-8px; width:48px; height:48px; opacity:0; cursor:pointer; }
+  .sw.custom::after { content:"+"; position:absolute; inset:0; display:grid; place-items:center; color:#fff; font-weight:800; text-shadow:0 1px 2px rgba(0,0,0,.6); pointer-events:none; }
+  .sw.custom.has::after { content:"🎨"; font-size:12px; }
+  .danger-row { display:flex; gap:16px; padding:12px 0; margin-bottom:12px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+
+  #toast { position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:1200; padding:9px 18px; font-size:13px; display:none; border-radius:99px; max-width:min(560px, 90vw); text-align:center; }
+  body.drop::after { content:"Відпустіть файл, щоб додати замовлення до вибраного магазину"; position:absolute; inset:0; z-index:2000; display:grid; place-items:center; text-align:center; padding:20px; font-size:22px; font-weight:700; background:rgba(241,100,30,.22); border:4px dashed var(--accent); }
+
+  /* ---------- leaflet ---------- */
+  .leaflet-control-zoom { border:0 !important; box-shadow:var(--shadow) !important; border-radius:14px !important; overflow:hidden; margin:0 14px 26px 0 !important; }
+  .leaflet-control-zoom a { background:var(--glass) !important; backdrop-filter:blur(18px); color:var(--fg) !important; border-color:var(--line) !important; width:36px !important; height:36px !important; line-height:36px !important; }
+  .leaflet-control-attribution { background:var(--glass) !important; color:var(--muted) !important; border-radius:8px 0 0 0; }
+  .leaflet-control-attribution a { color:var(--muted) !important; }
+  .pinwrap, .clusterwrap, .originwrap { filter:drop-shadow(0 3px 3px rgba(0,0,0,.35)); transition:transform .15s; }
+  .pinwrap { transform-origin:50% 100%; }
+  .pinwrap:hover, .clusterwrap:hover { transform:scale(1.1); }
+  .pinwrap.sel { transform:scale(1.25); filter:drop-shadow(0 0 8px var(--c)) drop-shadow(0 3px 3px rgba(0,0,0,.4)); z-index:9999 !important; }
+  .leaflet-tooltip.origin-tip { font-weight:650; border-radius:8px; }
+
+  @media (max-width:700px) {
+    #left { top:10px; left:10px; width:calc(100vw - 20px); max-height:calc(100% - 150px); gap:8px; }
+    #shopList { max-height:108px; }
+    #sheet { top:auto; bottom:0; right:0; left:0; width:100%; max-height:66%; border-radius:22px 22px 0 0; transform:translateY(40px); }
+    #topright { top:auto; bottom:16px; right:10px; flex-direction:column-reverse; align-items:flex-end; }
+    #topright > .glass { flex-direction:column; }
+    #view button { padding:0 8px; font-size:12px; }
+    #exportMenu { top:auto; bottom:0; right:48px; }
+    #bl { left:10px; bottom:16px; }
+    .seg button { padding:7px 9px; font-size:12px; }
+    .leaflet-control-zoom { display:none; }
+    #toast { bottom:auto; top:12px; border-radius:14px; }
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="left">
+  <div id="shopsCard" class="glass">
+    <div class="sh-head"><b>🏪 Мої магазини</b><button class="btn primary" id="addShop" style="padding:5px 12px">＋ Додати</button></div>
+    <div id="shopList"></div>
+  </div>
+
+  <div id="kpis">
+    <div class="glass kpi"><b id="kOrders">0</b><span>Замовлень</span></div>
+    <div class="glass kpi"><b id="kCities">0</b><span>Міст</span></div>
+    <div class="glass kpi"><b id="kCountries">0</b><span>Країн</span></div>
+    <div class="glass kpi"><b id="kRev">—</b><span>Дохід</span></div>
+  </div>
+
+  <div id="search" class="glass">
+    <span aria-hidden="true">🔍</span>
+    <input id="q" type="search" placeholder="Пошук міста, країни чи покупця" autocomplete="off">
+    <button class="ib" id="toggleFilters" title="Фільтри">⚙️</button>
+  </div>
+
+  <div id="filtersCard" class="glass">
+    <div class="lbl">Період</div>
+    <div class="chips" id="rangeChips"></div>
+    <div id="customRange" style="display:none;gap:8px;align-items:center;margin-top:10px"><input type="date" id="dFrom" aria-label="Початок"><span style="color:var(--muted)">—</span><input type="date" id="dTo" aria-label="Кінець"></div>
+    <div id="rangeNote" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
+    <div class="lbl">Покупці</div>
+    <div class="chips"><button class="chip" id="repeatChip">🔁 Лише повторні покупці</button></div>
+    <div class="lbl">Країни</div>
+    <div class="chips" id="countryChips"></div>
+    <div class="row" style="margin-top:12px"><button class="link" id="reset">Скинути фільтри</button><button class="link" id="fit">Показати всі піни</button></div>
+    <div class="file-row">
+      <button class="btn primary" id="uploadBtn">📂 Завантажити CSV / JSON</button>
+      <button class="btn" id="clear" title="Очистити кеш геокодингу">Скинути кеш</button>
+    </div>
+    <input id="file" type="file" accept=".csv,.json" hidden>
+  </div>
+</div>
+
+<div id="topright">
+  <div class="glass" id="view"><button data-v="world" class="on">Світ</button><button data-v="usa">США</button></div>
+  <div class="glass">
+    <button class="ib" id="routesBtn" title="Маршрути від вашого міста до покупців"></button>
+    <button class="ib" id="statsBtn" title="Статистика"></button>
+    <button class="ib" id="privacyBtn" title="Приватний режим"></button>
+    <div id="exportWrap">
+      <button class="ib" id="exportBtn" title="Експорт"></button>
+      <div id="exportMenu" class="glass">
+        <button id="expPng">🖼 Зображення мапи (PNG)<small>Для поста чи звіту, з назвою магазину</small></button>
+        <button id="expCsv">📄 Замовлення (CSV)<small>Лише ті, що зараз видно на мапі</small></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="bl">
+  <div class="glass seg" id="modes"><button data-d="pins">📍 Піни</button><button data-d="groups">⭕ Групи</button><button data-d="heat">🔥 Теплова</button></div>
+  <div class="glass seg" id="layers"><button data-m="map" class="on">Мапа</button><button data-m="sat">Супутник</button><button data-m="terrain">Рельєф</button></div>
+</div>
+
+<div id="sheet" class="glass" aria-live="polite"></div>
+
+<div id="dlg">
+  <div class="box">
+    <h3 id="dlgTitle">Новий магазин</h3>
+    <label class="f">Назва магазину</label>
+    <input type="text" id="dlgName" maxlength="40" placeholder="Наприклад, My Handmade Shop">
+    <div class="logo-row">
+      <div class="av" id="dlgAv"></div>
+      <label class="btn">Завантажити логотип<input id="dlgFile" type="file" accept="image/*" hidden></label>
+      <button class="link" id="dlgRemoveLogo">Прибрати</button>
+    </div>
+    <div class="row"><label class="f" style="margin:0">Колір пінів</label><button class="link" id="dlgFromLogo" style="display:none">🎨 Взяти з логотипа</button></div>
+    <div class="swatches" id="swatches"></div>
+    <label class="f">Місто відправки (для маршрутів і відстаней)</label>
+    <input type="text" id="dlgOrigin" placeholder="Наприклад, Kyiv, Ukraine">
+    <div class="hint" id="dlgOriginHint">Необов'язково.</div>
+    <div class="danger-row" id="dlgDanger">
+      <button class="link danger" id="dlgClear">Очистити замовлення</button>
+      <button class="link danger" id="dlgDelete">Видалити магазин</button>
+    </div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="dlgCancel">Скасувати</button><button class="btn primary" id="dlgSave">Зберегти</button></div>
+  </div>
+</div>
+<div id="toast" class="glass"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const ls = { get(k){ try { return localStorage.getItem(k); } catch { return null; } }, set(k,v){ try { localStorage.setItem(k,v); return true; } catch { return false; } }, del(k){ try { localStorage.removeItem(k); } catch {} } };
+let toastTimer; const toast = (t, ms) => { const el=$('toast'); clearTimeout(toastTimer); if(!t){ el.style.display='none'; return; } el.textContent=t; el.style.display='block'; if(ms) toastTimer=setTimeout(()=>el.style.display='none', ms); };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const COLORS = ['#f1641e','#2f80ed','#1fa971','#9b51e0','#e5484d','#e0a800','#0fa3b1','#e255a1'];
+const isDesktop = () => matchMedia('(min-width:701px)').matches;
+
+// ================= storage: IndexedDB (falls back to localStorage) =================
+const kv = (() => {
+  let dbp = null;
+  const db = () => dbp || (dbp = new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error('no indexedDB'));
+    const r = indexedDB.open('etsy-orders-map', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const tx = async (mode, fn) => { const d = await db(); return new Promise((res, rej) => { const t = d.transaction('kv', mode), q = fn(t.objectStore('kv')); t.oncomplete = () => res(q.result); t.onerror = t.onabort = () => rej(t.error); }); };
+  return {
+    async get(k) { try { return await tx('readonly', s => s.get(k)); } catch { try { return JSON.parse(ls.get('kv:'+k)) ?? undefined; } catch { return undefined; } } },
+    async set(k, v) { try { await tx('readwrite', s => s.put(v, k)); return true; } catch { return ls.set('kv:'+k, JSON.stringify(v)); } },
+    async del(k) { try { await tx('readwrite', s => s.delete(k)); } catch {} ls.del('kv:'+k); },
+  };
+})();
+
+// ================= shops =================
+let shops = [], activeId = null;
+const uid = () => 's' + Math.random().toString(36).slice(2,9);
+const shopMeta = ({places, loading, ...m}) => m;
+function saveShops() { kv.set('shops', shops.map(shopMeta)); }
+async function saveData(s) { if (!await kv.set('data:'+s.id, s.places)) toast('Не вдалося зберегти дані в браузері — після перезавантаження їх треба буде додати знову.', 6000); }
+const shopById = id => shops.find(s => s.id===id);
+const activeShop = () => shopById(activeId) || shops[0];
+const avatarHTML = (s, cls='av') => s.logo ? `<img class="${cls}" style="--c:${s.color}" src="${esc(s.logo)}" alt="">` : `<div class="${cls}" style="--c:${s.color}">${esc((s.name.trim()[0]||'M').toUpperCase())}</div>`;
+const nOrders = s => s.places.reduce((n,p)=>n+p.orders.length,0);
+const placeKey = l => [l.city,l.state,l.country].map(x => (x||'').trim().toLowerCase()).join('|');
+
+// repeat buyers: every order gets nth (1-based) and of (total orders by that buyer in this shop)
+const buyerKey = o => (o.buyer||'').trim().toLowerCase().replace(/\s+/g,' ');
+function computeRepeat(shop) {
+  const by = new Map();
+  shop.places.forEach(p => p.orders.forEach(o => { const k = buyerKey(o); o.nth = 0; o.of = 0; if (k) { if (!by.has(k)) by.set(k, []); by.get(k).push(o); } }));
+  by.forEach(list => { list.sort((a,b) => (Date.parse(a.date)||0) - (Date.parse(b.date)||0)); list.forEach((o,i) => { o.nth = i+1; o.of = list.length; }); });
+}
+
+const svg = (p, s=17) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const PIN = '<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>';
+const ICON = {
+  up:     svg('<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>'),
+  edit:   svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
+  pin:    svg(PIN),
+  pinOff: svg(PIN + '<path d="M3 3l18 18"/>'),
+  route:  svg('<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5"/>'),
+  stats:  svg('<path d="M3 21h18"/><path d="M7 17v-6M12 17V5M17 17v-9"/>'),
+  lock:   svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
+  unlock: svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/>'),
+  download: svg('<path d="M12 4v11M7 10l5 5 5-5M4 20h16"/>'),
+};
+
+function renderShops() {
+  const box = $('shopList'); box.innerHTML = '';
+  shops.forEach(s => {
+    const el = document.createElement('div'); el.className = 'shop'+(s.id===activeId?' active':''); el.style.setProperty('--c', s.color);
+    const n = nOrders(s);
+    el.innerHTML = `${avatarHTML(s)}<div class="t"><div class="n">${esc(s.name)}</div><div class="s">${s.loading ? '⏳ '+esc(s.loading) : n ? `<span class="dotc"></span>${n} замовлень · ${s.places.length} міст` : 'Немає даних — завантажте CSV'}</div></div>
+      <div class="acts"><button class="ib" data-a="up" title="Завантажити замовлення">${ICON.up}</button><button class="ib" data-a="edit" title="Редагувати">${ICON.edit}</button><button class="ib${s.visible?'':' off'}" data-a="eye" title="${s.visible?'Сховати піни магазину':'Показати піни магазину'}">${s.visible?ICON.pin:ICON.pinOff}</button></div>`;
+    el.onclick = e => {
+      const a = e.target.closest('button')?.dataset.a;
+      activeId = s.id;
+      if (a==='up') $('file').click();
+      else if (a==='edit') openDlg(s);
+      else if (a==='eye') { s.visible = !s.visible; saveShops(); if (!s.visible && selected?.shop===s) closeSheet(); refresh(true); }
+      renderShops(); syncUploadLabel();
+    };
+    box.appendChild(el);
+  });
+}
+function syncUploadLabel() { $('uploadBtn').textContent = `📂 Завантажити для «${activeShop().name}»`; }
+$('uploadBtn').onclick = () => $('file').click();
+
+// ---- add / edit shop dialog ----
+let dlgShop = null, draft = {};
+function dlgRender() {
+  const tmp = { ...draft, name: $('dlgName').value || draft.name };
+  $('dlgAv').outerHTML = avatarHTML(tmp).replace('class="av"','class="av" id="dlgAv"');
+  const sw = $('swatches'); sw.innerHTML='';
+  COLORS.forEach(c => { const b=document.createElement('button'); b.className='sw'+(c===draft.color?' on':''); b.style.setProperty('--c',c); b.onclick=()=>{ draft.color=c; dlgRender(); }; sw.appendChild(b); });
+  const custom = !COLORS.includes(draft.color);
+  const lab = document.createElement('label'); lab.className = 'sw custom' + (custom ? ' has on' : ''); lab.title = 'Свій колір';
+  lab.style.setProperty('--c', draft.color);
+  const inp = document.createElement('input'); inp.type = 'color'; inp.value = /^#[0-9a-f]{6}$/i.test(draft.color) ? draft.color : '#f1641e';
+  inp.oninput = () => { draft.color = inp.value; lab.style.setProperty('--c', inp.value); lab.classList.add('has','on'); sw.querySelectorAll('button.sw').forEach(x=>x.classList.remove('on')); $('dlgAv').style.setProperty('--c', inp.value); };
+  lab.appendChild(inp); sw.appendChild(lab);
+  $('dlgFromLogo').style.display = draft.logo ? '' : 'none';
+}
+// dominant saturated colour of an image — ignores transparent, near-white/black and grey pixels
+function dominantColor(src) {
+  const s = 40, c = document.createElement('canvas'); c.width = c.height = s;
+  const x = c.getContext('2d', { willReadFrequently:true }); x.drawImage(src, 0, 0, s, s);
+  const d = x.getImageData(0, 0, s, s).data, B = Array.from({length:12}, () => ({w:0,r:0,g:0,b:0}));
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i+3] < 128) continue;
+    const r=d[i]/255, g=d[i+1]/255, b=d[i+2]/255, mx=Math.max(r,g,b), mn=Math.min(r,g,b), l=(mx+mn)/2, dd=mx-mn;
+    if (dd < .08 || l > .93 || l < .07) continue;
+    const sat = dd / (1 - Math.abs(2*l - 1));
+    if (sat < .3) continue;
+    let h = mx===r ? ((g-b)/dd)%6 : mx===g ? (b-r)/dd+2 : (r-g)/dd+4; h = (h*60+360)%360;
+    const w = sat * (1 - Math.abs(l - .5)), k = B[Math.floor(h/30)%12];
+    k.w += w; k.r += d[i]*w; k.g += d[i+1]*w; k.b += d[i+2]*w;
+  }
+  const top = B.reduce((a,b) => b.w > a.w ? b : a);
+  if (top.w <= 0) return null;
+  let r=top.r/top.w/255, g=top.g/top.w/255, b=top.b/top.w/255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), l=(mx+mn)/2, t=Math.min(.55, Math.max(.38, l));
+  if (t !== l) { const f = t > l ? (t - l) / (1 - l) : (t - l) / l; const mix = v => f > 0 ? v + (1 - v) * f : v * (1 + f); r=mix(r); g=mix(g); b=mix(b); }
+  return '#' + [r,g,b].map(v => Math.round(Math.min(1,Math.max(0,v))*255).toString(16).padStart(2,'0')).join('');
+}
+$('dlgFromLogo').onclick = () => {
+  if (!draft.logo) return;
+  const img = new Image();
+  img.onload = () => { const col = dominantColor(img); if (col) { draft.color = col; dlgRender(); } else toast('На логотипі немає яскравого кольору — оберіть вручну.', 3500); };
+  img.src = draft.logo;
+};
+function confirmBtn(btn, label, action) { // two-step confirmation on the same button
+  btn.onclick = () => { if (btn.dataset.armed) return action(); btn.dataset.armed = '1'; btn.textContent = label; };
+}
+function openDlg(shop) {
+  dlgShop = shop;
+  draft = shop ? { name:shop.name, logo:shop.logo, color:shop.color } : { name:'', logo:'', color: COLORS[shops.length % COLORS.length] };
+  $('dlgTitle').textContent = shop ? 'Редагувати магазин' : 'Новий магазин';
+  $('dlgName').value = draft.name;
+  $('dlgOrigin').value = shop?.origin?.q || '';
+  $('dlgOriginHint').textContent = shop?.origin ? `Знайдено на мапі ✓` : 'Необов\'язково. Потрібно для маршрутів і відстаней.';
+  $('dlgDanger').style.display = shop ? '' : 'none';
+  $('dlgDelete').style.display = shop && shops.length>1 ? '' : 'none';
+  $('dlgClear').style.display = shop && shop.places.length ? '' : 'none';
+  for (const [id, txt] of [['dlgDelete','Видалити магазин'],['dlgClear','Очистити замовлення']]) { $(id).textContent = txt; delete $(id).dataset.armed; }
+  dlgRender(); $('dlg').classList.add('open'); $('dlgName').focus();
+}
+$('addShop').onclick = () => openDlg(null);
+$('dlgName').oninput = () => !draft.logo && dlgRender();
+$('dlgRemoveLogo').onclick = () => { draft.logo=''; dlgRender(); };
+$('dlgCancel').onclick = () => $('dlg').classList.remove('open');
+$('dlg').onclick = e => { if (e.target.id==='dlg') $('dlg').classList.remove('open'); };
+$('dlgSave').onclick = async () => {
+  const name = $('dlgName').value.trim() || 'Магазин ' + (shops.length + (dlgShop?0:1));
+  let s = dlgShop;
+  if (s) Object.assign(s, { name, logo:draft.logo, color:draft.color });
+  else { s = { id:uid(), name, logo:draft.logo, color:draft.color, visible:true, places:[] }; shops.push(s); activeId = s.id; }
+  const oq = $('dlgOrigin').value.trim();
+  $('dlg').classList.remove('open');
+  if (!oq) delete s.origin;
+  else if (oq !== s.origin?.q) {
+    toast('Шукаю місто відправки…');
+    const c = await geocode({ city:oq });
+    if (c) { s.origin = { q:oq, lat:c[0], lng:c[1] }; toast(''); }
+    else { delete s.origin; toast(`Не вдалося знайти «${oq}» на мапі. Спробуйте формат «Місто, Країна».`, 5000); }
+  }
+  saveShops(); renderShops(); syncUploadLabel(); refresh(false);
+  if (!dlgShop) toast(`Магазин «${name}» додано. Натисніть ⬆ біля нього, щоб завантажити замовлення.`, 5000);
+};
+confirmBtn($('dlgDelete'), 'Точно видалити магазин?', () => {
+  kv.del('data:'+dlgShop.id); shops = shops.filter(s => s !== dlgShop); activeId = shops[0].id;
+  saveShops(); closeSheet(); $('dlg').classList.remove('open'); renderShops(); syncUploadLabel(); refresh(true);
+});
+confirmBtn($('dlgClear'), 'Точно очистити всі замовлення?', () => {
+  dlgShop.places = []; kv.del('data:'+dlgShop.id); closeSheet(); $('dlg').classList.remove('open'); renderShops(); refresh(true);
+  toast(`Замовлення магазину «${dlgShop.name}» очищено.`, 3000);
+});
+$('dlgFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image(), url = URL.createObjectURL(f);
+  img.onload = () => { const s=128, c=document.createElement('canvas'); c.width=c.height=s; const x=c.getContext('2d'); const m=Math.min(img.width,img.height); x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,s,s); draft.logo=c.toDataURL('image/png'); URL.revokeObjectURL(url); const col = dominantColor(c); if (col) draft.color = col; dlgRender(); };
+  img.src = url; e.target.value = '';
+};
+
+// ================= map + base layers =================
+const map = L.map('map', { worldCopyJump:true, zoomControl:false, minZoom:2 }).setView([25,10], 2);
+L.control.zoom({ position:'bottomright' }).addTo(map);
+const E = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+// crossOrigin lets the PNG export read the tiles (Esri sends Access-Control-Allow-Origin: *)
+const T = p => L.tileLayer(E+p+'/MapServer/tile/{z}/{y}/{x}', { attribution:'Tiles © Esri', maxZoom:18, crossOrigin:'anonymous' });
+const bases = { map: () => [T('World_Street_Map')], sat: () => [T('World_Imagery'), T('Reference/World_Boundaries_and_Places')], terrain: () => [T('World_Topo_Map')] };
+let baseMode = 'map', baseLayers = [];
+function setBase() {
+  baseLayers.forEach(l => map.removeLayer(l));
+  baseLayers = bases[baseMode]();
+  baseLayers.forEach((l,i) => { l.addTo(map); if (i===0) l.bringToBack(); });
+}
+document.querySelectorAll('#layers button').forEach(b => b.onclick = () => { baseMode=b.dataset.m; document.querySelectorAll('#layers button').forEach(x=>x.classList.toggle('on',x===b)); setBase(); });
+setBase();
+const views = { world:{c:[25,10],z:2}, usa:{c:[39.5,-98.5],z:4} };
+document.querySelectorAll('#view button').forEach(b => b.onclick = () => { document.querySelectorAll('#view button').forEach(x=>x.classList.toggle('on',x===b)); map.setView(views[b.dataset.v].c, views[b.dataset.v].z); });
+
+// ================= parsing =================
+function parseCSV(text) {
+  const rows=[]; let row=[], cur='', q=false;
+  for (let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){ if(ch=='"'){ if(text[i+1]=='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else if(ch=='"') q=true;
+    else if(ch==','){ row.push(cur); cur=''; }
+    else if(ch=='\n'||ch=='\r'){ if(ch=='\r'&&text[i+1]=='\n') i++; row.push(cur); cur=''; if(row.some(x=>x!=='')) rows.push(row); row=[]; }
+    else cur+=ch;
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  const head = (rows.shift()||[]).map(h=>h.trim().toLowerCase().replace(/^﻿/,''));
+  return rows.map(r => Object.fromEntries(head.map((h,i)=>[h,(r[i]||'').trim()])));
+}
+const pick = (o, keys) => { for (const k of keys) if (o[k]!==undefined && o[k]!==null && o[k]!=='') return o[k]; return ''; };
+const regionNames = (()=>{ try { return new Intl.DisplayNames(['en'],{type:'region'}); } catch { return null; } })();
+function countryName(c) {
+  c = String(c||'').trim();
+  if (/^[A-Za-z]{2}$/.test(c) && regionNames) { try { return regionNames.of(c.toUpperCase()) || c; } catch {} }
+  if (/^(usa|u\.s\.a?\.?)$/i.test(c)) return 'United States';
+  return c;
+}
+const num = v => { if (typeof v === 'number') return v; const n = parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n) ? null : n; };
+function normalize(o) {
+  // items → [{t: title, id: listing id}]; accepts the JSON from fetch-etsy.mjs, Etsy CSVs and this page's own CSV export
+  let items = [];
+  if (Array.isArray(o.items)) items = o.items.map(i => typeof i==='string' ? {t:i} : { t:i.title||i.t||'', id:String(i.listing_id||i.id||'') });
+  else if (pick(o,['item name','title'])) items = [{ t:pick(o,['item name','title']), id:String(pick(o,['listing id','listing_id'])) }];
+  else if (pick(o,['items'])) { const ids = String(pick(o,['listing ids'])).split(' | '); items = String(o.items).split(' | ').map((t,i) => ({ t, id: ids[i] || '' })); }
+  return {
+    city: pick(o, ['city','ship city','shipping city']),
+    state: pick(o, ['state','ship state','shipping state','state/province']),
+    country: countryName(pick(o, ['country','country_iso','ship country','shipping country'])),
+    lat: o.lat != null && o.lat !== '' ? +o.lat : null, lng: o.lng != null && o.lng !== '' ? +o.lng : null,
+    order: {
+      id: String(pick(o, ['order id','id','receipt_id'])),
+      date: pick(o, ['sale date','date','created']),
+      itemsCount: num(pick(o, ['number of items','items_count','quantity'])) ?? (items.length || null),
+      items,
+      buyer: pick(o, ['full name','ship name','name','buyer']),
+      total: num(pick(o, ['order total','order value','total','item total'])),
+      itemLevel: !pick(o, ['order total','order value','total']) && !!pick(o, ['item total']),
+      currency: pick(o, ['currency']) || 'USD',
+    },
+  };
+}
+// combine the same order coming from different exports (e.g. "Sold Orders" + "Sold Order Items")
+function mergeOrder(o, n) {
+  const m = { ...o };
+  ['date','buyer','currency'].forEach(k => { if (n[k]) m[k] = n[k]; });
+  if (n.items?.length) m.items = n.items;
+  if (n.itemsCount != null) m.itemsCount = n.itemsCount;
+  if (n.total != null && (!n.itemLevel || o.itemLevel || o.total == null)) { m.total = n.total; m.itemLevel = n.itemLevel; }
+  return m;
+}
+const fmtMoney = (v, cur) => { try { return new Intl.NumberFormat('en-US',{style:'currency',currency:cur,currencyDisplay:'narrowSymbol',maximumFractionDigits:2}).format(v); } catch { return v.toFixed(2)+' '+cur; } };
+const fmtCompact = (v, cur) => { try { return new Intl.NumberFormat('en-US',{style:'currency',currency:cur,currencyDisplay:'narrowSymbol',notation:'compact',maximumFractionDigits:1}).format(v); } catch { return fmtMoney(v,cur); } };
+function sumMoney(orders, compact=false) {
+  const by = {}; orders.forEach(o => { if (o.total!=null) by[o.currency] = (by[o.currency]||0)+o.total; });
+  const parts = Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([c,v]) => (compact ? fmtCompact : fmtMoney)(v,c));
+  return parts.length ? parts.join(' + ') : '—';
+}
+const fmtDate = s => { const t = Date.parse(s); return isNaN(t) ? (s||'') : new Date(t).toLocaleDateString('uk-UA',{day:'numeric',month:'short',year:'numeric'}); };
+const fmtKm = km => Math.round(km).toLocaleString('uk-UA') + ' км';
+const distKm = (a, b) => { const R=6371, r=Math.PI/180, dLa=(b[0]-a[0])*r, dLo=(b[1]-a[1])*r; const h=Math.sin(dLa/2)**2+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
+const itemsOf = o => (o.items||[]).map(i => typeof i==='string' ? {t:i} : i);
+
+// ================= geocoding (Nominatim, one request per second, cached) =================
+let cache = {};
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+let geoChain = Promise.resolve();
+function geocode(p) {
+  const q = [p.city, p.state, p.country].filter(Boolean).join(', ');
+  if (cache[q] !== undefined) return Promise.resolve(cache[q]);
+  const job = geoChain.then(async () => {
+    if (cache[q] !== undefined) return cache[q];
+    await sleep(1100);
+    try { const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q)); const j = await r.json(); cache[q] = j[0] ? [+j[0].lat, +j[0].lon] : null; } catch { return null; }
+    kv.set('geo', cache); return cache[q];
+  });
+  geoChain = job.catch(()=>{});
+  return job;
+}
+
+// ================= filters =================
+const filt = { q:'', countries:new Set(), range:'all', from:'', to:'', repeat:false };
+let privacy = ls.get('etsyPrivacy') === '1';
+const RANGES = [['all','Увесь час'],['today','Сьогодні'],['yesterday','Вчора'],['week','Цей тиждень'],['month','Цей місяць'],['quarter','Цей квартал'],['year','Цей рік'],['custom','Свій період']];
+const parseDay = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const fmtDay = d => d.toLocaleDateString('uk-UA');
+function rangeBounds() { // [startMs, endMs) or null for "all time"; weeks start on Monday
+  const k = filt.range; if (k==='all') return null;
+  const n = new Date(), y = n.getFullYear(), m = n.getMonth(), today = new Date(y, m, n.getDate()), day = 864e5;
+  let s, e;
+  if (k==='today') { s = today; e = new Date(+today + day); }
+  else if (k==='yesterday') { s = new Date(+today - day); e = today; }
+  else if (k==='week') { s = new Date(y, m, n.getDate() - (n.getDay()+6)%7); e = new Date(s.getFullYear(), s.getMonth(), s.getDate()+7); }
+  else if (k==='month') { s = new Date(y, m, 1); e = new Date(y, m+1, 1); }
+  else if (k==='quarter') { const qm = Math.floor(m/3)*3; s = new Date(y, qm, 1); e = new Date(y, qm+3, 1); }
+  else if (k==='year') { s = new Date(y, 0, 1); e = new Date(y+1, 0, 1); }
+  else { s = filt.from ? parseDay(filt.from) : new Date(-8.64e15); e = filt.to ? new Date(+parseDay(filt.to) + day) : new Date(8.64e15); }
+  return [+s, +e];
+}
+function rangeLabel() {
+  const b = rangeBounds(); if (!b) return 'Увесь час';
+  return (b[0] > -8e15 ? fmtDay(new Date(b[0])) : '…') + ' — ' + (b[1] < 8e15 ? fmtDay(new Date(b[1]-1)) : '…');
+}
+function ordersFiltered(orders, ignoreRange=false) {
+  const b = ignoreRange ? null : rangeBounds();
+  return orders.filter(o => {
+    if (filt.repeat && !(o.of > 1)) return false;
+    if (!b) return true;
+    const t = Date.parse(o.date); return !isNaN(t) && t >= b[0] && t < b[1];
+  });
+}
+// flat list of {shop, place, orders} that pass all filters
+function visibleEntries(ignoreRange=false) {
+  const q = filt.q.trim().toLowerCase(), out = [];
+  for (const shop of shops) { if (!shop.visible) continue;
+    for (const place of shop.places) {
+      if (place.lat == null) continue;
+      const orders = ordersFiltered(place.orders, ignoreRange);
+      if (!orders.length) continue;
+      if (filt.countries.size && !filt.countries.has(place.country)) continue;
+      if (q && ![place.city, place.state, place.country, ...(privacy ? [] : orders.map(o=>o.buyer))].join(' ').toLowerCase().includes(q)) continue;
+      out.push({ shop, place, orders });
+    } }
+  return out;
+}
+function setRange(k, from='', to='') {
+  filt.range = k; if (k==='custom') { filt.from = from; filt.to = to; }
+  renderRangeUI(); refresh(true);
+}
+function renderRangeUI() {
+  const box = $('rangeChips'); box.innerHTML = '';
+  RANGES.forEach(([k,label]) => { const b = document.createElement('button'); b.className = 'chip'+(filt.range===k?' on':''); b.textContent = label;
+    b.onclick = () => {
+      stopPlay();
+      if (k==='custom' && !filt.from && !filt.to) { const n = new Date(); return setRange('custom', isoDay(new Date(n.getFullYear(), n.getMonth(), 1)), isoDay(n)); }
+      setRange(k, filt.from, filt.to);
+    };
+    box.appendChild(b); });
+  $('customRange').style.display = filt.range==='custom' ? 'flex' : 'none';
+  $('dFrom').value = filt.from; $('dTo').value = filt.to;
+  $('rangeNote').textContent = filt.range==='all' ? '' : rangeLabel();
+}
+$('dFrom').onchange = e => { stopPlay(); setRange('custom', e.target.value, filt.to); };
+$('dTo').onchange = e => { stopPlay(); setRange('custom', filt.from, e.target.value); };
+$('repeatChip').onclick = () => { filt.repeat = !filt.repeat; $('repeatChip').classList.toggle('on', filt.repeat); refresh(true); };
+
+function buildFilterUI() {
+  const byC = new Map();
+  shops.filter(s=>s.visible).forEach(s => s.places.forEach(p => { if (p.lat==null) return; const n = ordersFiltered(p.orders).length; if (n) byC.set(p.country||'—', (byC.get(p.country||'—')||0)+n); }));
+  filt.countries.forEach(c => { if (!byC.has(c)) byC.set(c, 0); });
+  const box = $('countryChips'); box.innerHTML='';
+  if (!byC.size) box.innerHTML = '<span style="color:var(--muted)">Немає замовлень для цих фільтрів</span>';
+  [...byC].sort((a,b)=>b[1]-a[1]).forEach(([c,n]) => { const b=document.createElement('button'); b.className='chip'+(filt.countries.has(c)?' on':''); b.innerHTML=`${esc(c)}<small>${n}</small>`; b.onclick=()=>{ filt.countries.has(c)?filt.countries.delete(c):filt.countries.add(c); refresh(true); }; box.appendChild(b); });
+  $('repeatChip').classList.toggle('on', filt.repeat);
+}
+$('q').oninput = e => { filt.q=e.target.value; refresh(true); };
+$('reset').onclick = () => { stopPlay(); Object.assign(filt, { q:'', range:'all', from:'', to:'', repeat:false }); filt.countries.clear(); $('q').value=''; renderRangeUI(); refresh(true); };
+$('fit').onclick = () => redraw(true);
+$('toggleFilters').onclick = () => $('filtersCard').classList.toggle('open');
+
+// ================= map layers: pins / groups / heat + routes =================
+const pinLayer = L.layerGroup().addTo(map);
+const routeLayer = L.layerGroup().addTo(map);
+const clusterLayer = L.markerClusterGroup({ showCoverageOnHover:false, spiderfyOnMaxZoom:true, disableClusteringAtZoom:9, maxClusterRadius:55, iconCreateFunction:clusterIcon });
+let heatLayer = null;
+let display = ['pins','groups','heat'].includes(ls.get('etsyDisplay')) ? ls.get('etsyDisplay') : 'groups';
+let routesOn = ls.get('etsyRoutes') === '1';
+let selected = null, sheet = null; // sheet: 'place' | 'stats'
+
+function pinIcon(count, sel, color, shiftX) {
+  const w = Math.round(Math.min(48, 28 + Math.sqrt(count)*4)), h = Math.round(w*1.5);
+  const label = count>1 ? `<text x="12" y="15.6" text-anchor="middle" font-size="${count>99?7.5:count>9?9:10.5}" font-weight="800" font-family="system-ui,-apple-system,sans-serif" fill="${color}">${count}</text>` : `<circle cx="12" cy="12" r="3.2" fill="${color}"/>`;
+  const gid = 'g'+color.slice(1);
+  return L.divIcon({ className:'pinwrap'+(sel?' sel':''), iconSize:[w,h], iconAnchor:[w/2 - shiftX, h],
+    html:`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 24 36" style="--c:${color}"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".78"/><stop offset="1" stop-color="${color}"/></linearGradient></defs><path d="M12 .8C5.8.8.8 5.8.8 12c0 8.6 11.2 23 11.2 23S23.2 20.6 23.2 12C23.2 5.8 18.2.8 12 .8z" fill="url(#${gid})" stroke="#fff" stroke-width="1.6"/><circle cx="12" cy="12" r="7.6" fill="#fff"/>${label}</svg>` });
+}
+// cluster = white disc with a ring split by shop share and the total number of orders
+function clusterIcon(cluster) {
+  const by = new Map(); let total = 0;
+  cluster.getAllChildMarkers().forEach(m => { total += m.options.orders; by.set(m.options.color, (by.get(m.options.color)||0) + m.options.orders); });
+  const size = Math.round(Math.min(70, 36 + Math.sqrt(total)*3)), r = 15.9155;
+  let off = 0;
+  const segs = [...by].map(([c,n]) => { const len = n/total*100; const s = `<circle cx="20" cy="20" r="${r}" fill="none" stroke="${c}" stroke-width="5.5" stroke-dasharray="${len} ${100-len}" stroke-dashoffset="${-off}" transform="rotate(-90 20 20)"/>`; off += len; return s; }).join('');
+  return L.divIcon({ className:'clusterwrap', iconSize:[size,size],
+    html:`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 40 40"><circle cx="20" cy="20" r="19" fill="#fff"/>${segs}<text x="20" y="24.2" text-anchor="middle" font-size="${total>999?9:total>99?10.5:12.5}" font-weight="800" font-family="system-ui,-apple-system,sans-serif" fill="#1c1b1a">${total}</text></svg>` });
+}
+function originIcon(color) {
+  return L.divIcon({ className:'originwrap', iconSize:[34,34], iconAnchor:[17,17],
+    html:`<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34"><circle cx="17" cy="17" r="15.5" fill="${color}" stroke="#fff" stroke-width="2.5"/><path d="M10 17.5 17 11l7 6.5M12 16v7h4v-4h2v4h4v-7" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>` });
+}
+function arc(a, b) { // gently curved line between two [lat,lng] points, taking the short way around the globe
+  let [la1, lo1] = a, [la2, lo2] = b;
+  if (lo2 - lo1 > 180) lo2 -= 360; else if (lo1 - lo2 > 180) lo2 += 360;
+  const c = [(la1+la2)/2 - (lo2-lo1)*.16, (lo1+lo2)/2 + (la2-la1)*.16], pts = [];
+  for (let i = 0; i <= 28; i++) { const t = i/28, u = 1-t; pts.push([Math.max(-85, Math.min(85, u*u*la1 + 2*u*t*c[0] + t*t*la2)), u*u*lo1 + 2*u*t*c[1] + t*t*lo2]); }
+  return pts;
+}
+
+function redraw(fit=false) {
+  pinLayer.clearLayers(); clusterLayer.clearLayers(); routeLayer.clearLayers();
+  if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+  const vis = visibleEntries(), all = [];
+  $('toggleFilters').classList.toggle('active', !!(filt.q || filt.countries.size || filt.range!=='all' || filt.repeat));
+  const slots = new Map(); // pins of different shops in the same city are nudged apart
+  vis.forEach(e => { const k = e.place.lat.toFixed(2)+','+e.place.lng.toFixed(2); if (!slots.has(k)) slots.set(k, []); slots.get(k).push(e); });
+  const markers = [];
+  for (const e of vis) {
+    all.push(...e.orders);
+    const n = e.orders.length, isSel = selected?.place === e.place;
+    if (display === 'heat') {
+      markers.push(L.circleMarker([e.place.lat, e.place.lng], { radius:isSel?7:4.5, color:'#fff', weight:1.5, fillColor:e.shop.color, fillOpacity:1, orders:n, bubblingMouseEvents:false })
+        .bindTooltip(`${e.place.city||'—'}: ${n}`, { direction:'top' }).on('click', () => openPlace(e)));
+    } else {
+      const grp = slots.get(e.place.lat.toFixed(2)+','+e.place.lng.toFixed(2));
+      const shift = grp.length>1 ? (grp.indexOf(e) - (grp.length-1)/2) * 16 : 0;
+      markers.push(L.marker([e.place.lat, e.place.lng], { icon:pinIcon(n, isSel, e.shop.color, shift), title:`${e.shop.name}: ${e.place.city||''} — ${n}`, riseOnHover:true, orders:n, color:e.shop.color }).on('click', () => openPlace(e)));
+    }
+  }
+  if (display === 'groups') { clusterLayer.addLayers(markers); if (!map.hasLayer(clusterLayer)) map.addLayer(clusterLayer); }
+  else { if (map.hasLayer(clusterLayer)) map.removeLayer(clusterLayer); markers.forEach(m => m.addTo(pinLayer)); }
+  if (display === 'heat' && vis.length && L.heatLayer) {
+    const max = Math.max(...vis.map(e => e.orders.length));
+    heatLayer = L.heatLayer(vis.map(e => [e.place.lat, e.place.lng, e.orders.length]), { radius:30, blur:24, maxZoom:6, max: Math.max(1, max*.7), minOpacity:.35, gradient:{ .2:'#ffd9a0', .45:'#ffa94d', .7:'#f1641e', 1:'#b3261e' } }).addTo(map);
+    pinLayer.eachLayer(l => l.bringToFront());
+  }
+  if (routesOn) {
+    for (const s of shops) {
+      if (!s.visible || !s.origin) continue;
+      const o = [s.origin.lat, s.origin.lng], mine = vis.filter(e => e.shop === s);
+      mine.forEach(e => L.polyline(arc(o, [e.place.lat, e.place.lng]), { color:s.color, weight: Math.min(4, 1.2 + Math.log2(e.orders.length)*.7), opacity:.55, interactive:false }).addTo(routeLayer));
+      L.marker(o, { icon:originIcon(s.color), zIndexOffset:2000 }).bindTooltip(`🏠 ${s.name}: ${s.origin.q}`, { direction:'top', className:'origin-tip', offset:[0,-14] }).addTo(routeLayer);
+    }
+  }
+  $('kOrders').textContent = all.length;
+  $('kCities').textContent = new Set(vis.map(e => placeKey(e.place))).size;
+  $('kCountries').textContent = new Set(vis.map(e => e.place.country)).size;
+  const full = sumMoney(all); $('kRev').textContent = full.length > 11 ? sumMoney(all, true) : full; $('kRev').title = full;
+  if (fit && vis.length) {
+    const pts = vis.map(e => [e.place.lat, e.place.lng]);
+    if (routesOn) shops.forEach(s => { if (s.visible && s.origin) pts.push([s.origin.lat, s.origin.lng]); });
+    // keep pins clear of the floating panels, but never squeeze the map into a sliver on smaller screens
+    const W = map.getSize().x, H = map.getSize().y;
+    const left = isDesktop() && W > 900 ? 400 : 20, right = isDesktop() && sheet && W > 1150 ? 440 : 40;
+    const top = isDesktop() ? 60 : Math.min(H * .45, 330), bottom = isDesktop() ? 60 : 110;
+    map.fitBounds(L.latLngBounds(pts).pad(.2), { maxZoom:6, paddingTopLeft:[left, top], paddingBottomRight:[right, bottom] });
+  }
+}
+// rebuild everything that depends on data/filters
+function refresh(fit=false) {
+  buildFilterUI(); redraw(fit);
+  if (sheet === 'stats') renderStats();
+  else if (sheet === 'place' && selected) { const e = visibleEntries().find(x => x.place === selected.place); e ? openPlace(e, false) : closeSheet(); }
+}
+
+document.querySelectorAll('#modes button').forEach(b => {
+  b.classList.toggle('on', b.dataset.d === display);
+  b.onclick = () => { display = b.dataset.d; ls.set('etsyDisplay', display); document.querySelectorAll('#modes button').forEach(x => x.classList.toggle('on', x===b)); redraw(false); };
+});
+function syncTopButtons() {
+  $('routesBtn').innerHTML = ICON.route; $('routesBtn').classList.toggle('on', routesOn);
+  $('statsBtn').innerHTML = ICON.stats; $('statsBtn').classList.toggle('on', sheet === 'stats');
+  $('privacyBtn').innerHTML = privacy ? ICON.lock : ICON.unlock; $('privacyBtn').classList.toggle('on', privacy);
+  $('privacyBtn').title = privacy ? 'Приватний режим увімкнено: імена покупців сховані' : 'Приватний режим: сховати імена покупців';
+  $('exportBtn').innerHTML = ICON.download;
+  $('q').placeholder = privacy ? 'Пошук міста чи країни' : 'Пошук міста, країни чи покупця';
+}
+$('routesBtn').onclick = () => {
+  routesOn = !routesOn; ls.set('etsyRoutes', routesOn ? '1' : '0'); syncTopButtons(); redraw(false);
+  if (routesOn && !shops.some(s => s.visible && s.origin)) toast('Вкажіть «Місто відправки» в налаштуваннях магазину (✎), щоб побачити маршрути.', 5000);
+};
+$('privacyBtn').onclick = () => { privacy = !privacy; ls.set('etsyPrivacy', privacy ? '1' : '0'); syncTopButtons(); refresh(false); toast(privacy ? '🔒 Імена покупців сховані — можна показувати мапу іншим.' : 'Імена покупців знову видно.', 3000); };
+$('statsBtn').onclick = () => sheet === 'stats' ? closeSheet() : openStats();
+$('exportBtn').onclick = e => { e.stopPropagation(); $('exportMenu').classList.toggle('open'); };
+document.addEventListener('click', e => { if (!e.target.closest('#exportWrap')) $('exportMenu').classList.remove('open'); });
+$('expPng').onclick = () => { $('exportMenu').classList.remove('open'); exportPNG(); };
+$('expCsv').onclick = () => { $('exportMenu').classList.remove('open'); exportCSV(); };
+
+// ================= right sheet: orders of one place =================
+function openSheet(kind, color) {
+  sheet = kind; const m = $('sheet'); m.style.setProperty('--c', color || 'var(--accent)'); m.classList.add('open'); syncTopButtons();
+}
+function closeSheet() {
+  if (!sheet) return; stopPlay(); const wasSel = !!selected;
+  sheet = null; selected = null; $('sheet').classList.remove('open'); syncTopButtons(); if (wasSel) redraw(false);
+}
+map.on('click', closeSheet);
+document.addEventListener('keydown', e => { if (e.key==='Escape') { closeSheet(); $('dlg').classList.remove('open'); $('exportMenu').classList.remove('open'); } });
+
+function openPlace(e, pan=true) {
+  stopPlay();
+  const changed = selected?.place !== e.place;
+  selected = e; const { shop, place:p } = e;
+  const sorted = [...e.orders].sort((a,b) => (Date.parse(b.date)||0) - (Date.parse(a.date)||0));
+  const dates = e.orders.map(o=>Date.parse(o.date)).filter(Boolean).sort((a,b)=>a-b);
+  const dist = shop.origin ? distKm([shop.origin.lat, shop.origin.lng], [p.lat, p.lng]) : null;
+  const rows = sorted.map(o => {
+    const items = itemsOf(o);
+    const titles = items.length
+      ? items.map(i => { const t = esc(i.t || 'Лістинг'); return i.id ? `<a href="https://www.etsy.com/listing/${encodeURIComponent(i.id)}" target="_blank" rel="noopener noreferrer" title="Відкрити лістинг на Etsy">${t} ↗</a>` : t; }).join('<br>')
+      : esc(o.itemsCount ? `${o.itemsCount} товар(ів)` : 'Замовлення');
+    const meta = [!privacy && o.buyer ? '👤 '+o.buyer : '', fmtDate(o.date), o.id ? '#'+o.id : ''].filter(Boolean).map(esc).join(' · ');
+    const rep = o.of > 1 ? `<span class="badge" title="Покупець замовляв ${o.of} рази">🔁 ${o.nth}-ге з ${o.of}</span>` : '';
+    return `<div class="order"><div class="ic">🛍️</div><div class="mid"><div class="tt">${titles}</div><div class="mm">${meta}${rep}</div></div><div class="pr">${o.total!=null ? esc(fmtMoney(o.total,o.currency)) : ''}</div></div>`;
+  }).join('');
+  $('sheet').innerHTML = `
+    <div class="m-head"><div class="m-pin">📍</div>
+      <div style="flex:1;min-width:0"><div class="m-title">${esc(p.city||'Невідоме місто')}</div><div class="m-sub">${esc([p.state,p.country].filter(Boolean).join(', '))}${dist!=null ? ` · 📦 ~${fmtKm(dist)}` : ''}</div>
+        <div class="m-shop">${avatarHTML(shop)}${esc(shop.name)}</div></div>
+      <button class="ib" id="mClose" title="Закрити (Esc)">✕</button></div>
+    <div class="m-stats">
+      <div class="m-stat"><b>${e.orders.length}</b><span>Замовлень</span></div>
+      <div class="m-stat"><b title="${esc(sumMoney(e.orders))}">${esc(sumMoney(e.orders))}</b><span>Дохід</span></div>
+      <div class="m-stat"><b>${dates.length ? esc(new Date(dates[dates.length-1]).toLocaleDateString('uk-UA')) : '—'}</b><span>Останнє</span></div>
+    </div>
+    <div class="m-list"><div class="m-h">Замовлення з цього міста${filt.range!=='all' ? ' · '+esc(rangeLabel()) : ''}</div>${rows || '<div class="empty">Немає деталей замовлень</div>'}</div>`;
+  $('mClose').onclick = closeSheet;
+  openSheet('place', shop.color);
+  if (changed) redraw(false);
+  if (pan && isDesktop()) { const pt = map.latLngToContainerPoint([p.lat,p.lng]), W = map.getSize().x; if (pt.x > W-460) map.panBy([pt.x-(W-460), 0]); }
+}
+
+// ================= right sheet: statistics =================
+let statsTab = 'cities', playTimer = null;
+const MONTHS = ['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'];
+const monthKey = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
+const monthLabel = k => { const [y,m] = k.split('-'); return `${MONTHS[+m-1]} ${y}`; };
+function monthsOf(entries) {
+  const counts = new Map(); let min = Infinity, max = -Infinity;
+  entries.forEach(e => e.orders.forEach(o => { const t = Date.parse(o.date); if (isNaN(t)) return; const k = monthKey(t); counts.set(k, (counts.get(k)||0)+1); min = Math.min(min, t); max = Math.max(max, t); }));
+  if (!counts.size) return [];
+  const out = [], d = new Date(new Date(min).getFullYear(), new Date(min).getMonth(), 1), end = new Date(max);
+  while (d <= end) { const k = monthKey(+d); out.push({ k, n: counts.get(k)||0 }); d.setMonth(d.getMonth()+1); }
+  return out.slice(-48);
+}
+const monthEnd = k => { const [y,m] = k.split('-').map(Number); return isoDay(new Date(y, m, 0)); };
+function stopPlay() { if (playTimer) { clearInterval(playTimer); playTimer = null; if (sheet === 'stats') renderStats(); } }
+function play() {
+  const months = monthsOf(visibleEntries(true)); if (!months.length) return;
+  stopPlay(); let i = 0; const from = months[0].k + '-01';
+  const step = () => {
+    filt.range = 'custom'; filt.from = from; filt.to = monthEnd(months[i].k); renderRangeUI(); buildFilterUI(); redraw(i===0);
+    renderStats(months[i].k);
+    if (++i >= months.length) { clearInterval(playTimer); playTimer = null; renderStats(); }
+  };
+  step(); if (months.length > 1) playTimer = setInterval(step, 700);
+}
+
+function openStats() { if (selected) { selected = null; redraw(false); } openSheet('stats'); renderStats(); }
+function renderStats(playingMonth) {
+  const vis = visibleEntries(), orders = vis.flatMap(e => e.orders);
+  // summary
+  const byCur = {}; orders.forEach(o => { if (o.total!=null) { (byCur[o.currency] ||= { s:0, n:0 }); byCur[o.currency].s += o.total; byCur[o.currency].n++; } });
+  const main = Object.entries(byCur).sort((a,b) => b[1].n - a[1].n)[0];
+  const avg = main ? fmtMoney(main[1].s / main[1].n, main[0]) : '—';
+  const buyers = new Map(); orders.forEach(o => { const k = buyerKey(o); if (k) buyers.set(k, Math.max(buyers.get(k)||0, o.of||1)); });
+  const repeatPct = buyers.size ? Math.round([...buyers.values()].filter(n => n > 1).length / buyers.size * 100) + '%' : '—';
+  const itemsSold = orders.reduce((s,o) => s + (o.itemsCount || itemsOf(o).length || 1), 0);
+  let dSum = 0, dN = 0; vis.forEach(e => { if (!e.shop.origin) return; const d = distKm([e.shop.origin.lat, e.shop.origin.lng], [e.place.lat, e.place.lng]); dSum += d * e.orders.length; dN += e.orders.length; });
+  // timeline (ignores the date filter, highlights months inside it)
+  const months = monthsOf(visibleEntries(true)), maxM = Math.max(1, ...months.map(m => m.n)), b = rangeBounds();
+  const inRange = k => { if (playingMonth) return k <= playingMonth; if (!b) return true; const [y,m] = k.split('-').map(Number); const s = +new Date(y, m-1, 1), e = +new Date(y, m, 1); return s < b[1] && e > b[0]; };
+  const bars = months.map(m => `<div class="${inRange(m.k)?'in':''}" style="height:${Math.max(3, m.n/maxM*100)}%" data-k="${m.k}" title="${monthLabel(m.k)}: ${m.n} замовлень"></div>`).join('');
+  // ranking lists
+  const rank = rows => rows.length ? rows.map((r,i) => `<div class="rk" data-i="${i}"><div class="bar" style="width:${r.share*100}%"></div><span class="no">${i+1}</span><span class="nm">${r.name}${r.sub ? `<small>${r.sub}</small>` : ''}</span><span class="vl">${r.val}${r.rev ? `<small>${esc(r.rev)}</small>` : ''}</span></div>`).join('') : '<div class="empty">Немає даних</div>';
+  let rows = [], onPick = () => {};
+  if (statsTab === 'cities') {
+    const m = new Map(); vis.forEach(e => { const k = placeKey(e.place); if (!m.has(k)) m.set(k, { e, orders:[] }); m.get(k).orders.push(...e.orders); if (e.orders.length > m.get(k).e.orders.length) m.get(k).e = e; });
+    const list = [...m.values()].sort((a,b) => b.orders.length - a.orders.length).slice(0, 30), mx = list[0]?.orders.length || 1;
+    rows = list.map(x => ({ name:esc(x.e.place.city||'—'), sub:esc([x.e.place.state, x.e.place.country].filter(Boolean).join(', ')), val:x.orders.length, rev:sumMoney(x.orders), share:x.orders.length/mx }));
+    onPick = i => { const e = list[i].e; map.setView([e.place.lat, e.place.lng], Math.max(map.getZoom(), 7)); openPlace(e, false); };
+  } else if (statsTab === 'countries') {
+    const m = new Map(); vis.forEach(e => { const k = e.place.country||'—'; if (!m.has(k)) m.set(k, { c:k, orders:[], cities:new Set() }); m.get(k).orders.push(...e.orders); m.get(k).cities.add(placeKey(e.place)); });
+    const list = [...m.values()].sort((a,b) => b.orders.length - a.orders.length), mx = list[0]?.orders.length || 1;
+    rows = list.map(x => ({ name:esc(x.c), sub:`${x.cities.size} міст`, val:x.orders.length, rev:sumMoney(x.orders), share:x.orders.length/mx }));
+    onPick = i => { filt.countries = new Set([list[i].c]); refresh(true); };
+  } else if (statsTab === 'buyers') {
+    const m = new Map(); vis.forEach(e => e.orders.forEach(o => { const k = buyerKey(o); if (!k || !(o.of > 1)) return; if (!m.has(k)) m.set(k, { name:o.buyer, of:o.of, orders:[], city:e.place.city }); m.get(k).orders.push(o); }));
+    const list = [...m.values()].sort((a,b) => b.of - a.of || b.orders.length - a.orders.length).slice(0, 30), mx = list[0]?.of || 1;
+    rows = list.map((x,i) => ({ name: privacy ? `Покупець #${i+1}` : esc(x.name), sub:esc(x.city||''), val:`${x.of}×`, rev:sumMoney(x.orders), share:x.of/mx }));
+    onPick = i => { if (privacy) return; filt.q = list[i].name; $('q').value = filt.q; closeSheet(); refresh(true); };
+  } else {
+    const m = new Map(); vis.forEach(e => e.orders.forEach(o => itemsOf(o).forEach(it => { const k = it.id || it.t; if (!k) return; if (!m.has(k)) m.set(k, { it, n:0 }); m.get(k).n++; })));
+    const list = [...m.values()].sort((a,b) => b.n - a.n).slice(0, 30), mx = list[0]?.n || 1;
+    rows = list.map(x => ({ name: x.it.id ? `<a href="https://www.etsy.com/listing/${encodeURIComponent(x.it.id)}" target="_blank" rel="noopener noreferrer">${esc(x.it.t || 'Лістинг')} ↗</a>` : esc(x.it.t), val:`${x.n}×`, share:x.n/mx }));
+    onPick = () => {};
+  }
+  const TABS = [['cities','Міста'],['countries','Країни'],['buyers','Повторні'],['items','Товари']];
+  $('sheet').innerHTML = `
+    <div class="m-head"><div class="m-pin">📊</div>
+      <div style="flex:1;min-width:0"><div class="m-title">Статистика</div><div class="m-sub">${esc(rangeLabel())} · ${shops.filter(s=>s.visible).length} магазин(и)</div></div>
+      <button class="ib" id="mClose" title="Закрити (Esc)">✕</button></div>
+    <div class="st-body">
+      <div class="st-grid">
+        <div class="m-stat"><b>${esc(avg)}</b><span>Середній чек</span></div>
+        <div class="m-stat"><b>${repeatPct}</b><span>Повторні покупці</span></div>
+        <div class="m-stat"><b>${itemsSold}</b><span>Товарів продано</span></div>
+        <div class="m-stat"><b>${dN ? '~'+fmtKm(dSum/dN) : '—'}</b><span>${dN ? 'Сер. відстань' : 'Відстань: вкажіть місто ✎'}</span></div>
+      </div>
+      <div class="tl">
+        <div class="row"><span class="lbl" style="margin:0">Замовлення по місяцях</span><button class="link" id="playBtn">${playTimer ? '⏸ Зупинити' : '▶ Програти ріст'}</button></div>
+        ${months.length ? `<div class="tl-bars" id="tlBars">${bars}</div><div class="tl-axis"><span>${monthLabel(months[0].k)}</span><span>${playingMonth ? '<b style="color:var(--accent)">'+monthLabel(playingMonth)+'</b>' : ''}</span><span>${monthLabel(months[months.length-1].k)}</span></div>` : '<div class="empty">Немає дат замовлень</div>'}
+      </div>
+      <div class="tabs">${TABS.map(([k,l]) => `<button data-t="${k}" class="${statsTab===k?'on':''}">${l}</button>`).join('')}</div>
+      <div class="rk-list" id="rkList">${rank(rows)}</div>
+    </div>`;
+  $('mClose').onclick = closeSheet;
+  $('playBtn').onclick = () => playTimer ? stopPlay() : play();
+  $('sheet').querySelectorAll('.tabs button').forEach(b => b.onclick = () => { statsTab = b.dataset.t; renderStats(); });
+  $('tlBars')?.addEventListener('click', ev => { const k = ev.target.dataset?.k; if (!k) return; stopPlay(); setRange('custom', k+'-01', monthEnd(k)); });
+  $('rkList').onclick = ev => { if (ev.target.closest('a')) return; const r = ev.target.closest('.rk'); if (r) onPick(+r.dataset.i); };
+}
+
+// ================= export =================
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
+function exportCSV() {
+  const vis = visibleEntries(); if (!vis.length) return toast('Немає замовлень для експорту.', 3000);
+  const head = ['Shop','Order ID','Date','Buyer','City','State','Country','Items','Listing IDs','Quantity','Total','Currency','Repeat'];
+  const rows = vis.flatMap(e => e.orders.map(o => { const it = itemsOf(o); return [e.shop.name, o.id, o.date, privacy ? '' : o.buyer, e.place.city, e.place.state, e.place.country, it.map(i=>i.t).join(' | '), it.map(i=>i.id||'').join(' | ').replace(/^( \| )+$/,''), o.itemsCount ?? '', o.total ?? '', o.currency, o.of > 1 ? `${o.nth}/${o.of}` : '']; }));
+  const cell = v => { let s = String(v ?? ''); if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+  const csv = [head, ...rows].map(r => r.map(cell).join(',')).join('\n');
+  download(new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' }), `etsy-orders-${isoDay(new Date())}.csv`);
+  toast(`Експортовано ${rows.length} замовлень.`, 3000);
+}
+const loadImg = src => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+const svgToImg = el => { // rasterise an inline <svg> exactly as it is laid out on screen
+  const r = el.getBoundingClientRect(), cl = el.cloneNode(true);
+  cl.removeAttribute('style'); cl.setAttribute('xmlns','http://www.w3.org/2000/svg'); cl.setAttribute('width', r.width); cl.setAttribute('height', r.height);
+  return loadImg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(cl)));
+};
+async function exportPNG() {
+  toast('Готую зображення…');
+  const cont = map.getContainer(), box = cont.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.round(box.width), H = Math.round(box.height), F = 76;
+  const c = document.createElement('canvas'); c.width = W*dpr; c.height = (H+F)*dpr;
+  const x = c.getContext('2d'); x.scale(dpr, dpr); x.fillStyle = '#e8e4de'; x.fillRect(0, 0, W, H);
+  const at = el => { const r = el.getBoundingClientRect(); return [r.left - box.left, r.top - box.top, r.width, r.height]; };
+  cont.querySelectorAll('.leaflet-tile-pane img.leaflet-tile-loaded').forEach(img => { try { x.drawImage(img, ...at(img)); } catch {} });
+  cont.querySelectorAll('.leaflet-overlay-pane canvas').forEach(cv => { try { x.drawImage(cv, ...at(cv)); } catch {} });
+  for (const s of cont.querySelectorAll('.leaflet-overlay-pane svg')) { const im = await svgToImg(s); if (im) x.drawImage(im, ...at(s)); }
+  const icons = [...cont.querySelectorAll('.leaflet-marker-pane .leaflet-marker-icon')].sort((a,b) => (+a.style.zIndex||0) - (+b.style.zIndex||0));
+  for (const ic of icons) { const s = ic.querySelector('svg'); if (!s) continue; const im = await svgToImg(s); if (im) x.drawImage(im, ...at(s)); }
+  x.font = '11px system-ui,-apple-system,sans-serif'; x.fillStyle = 'rgba(0,0,0,.55)'; x.textAlign = 'right'; x.fillText('Tiles © Esri · Leaflet', W - 8, H - 8);
+  // footer with shop branding and current numbers
+  x.fillStyle = '#fff'; x.fillRect(0, H, W, F); x.fillStyle = '#f1641e'; x.fillRect(0, H, W, 3);
+  const vis = shops.filter(s => s.visible); let lx = 16;
+  for (const s of vis.slice(0, 4)) {
+    const y = H + 18;
+    if (s.logo) { const im = await loadImg(s.logo); if (im) { x.save(); x.beginPath(); x.roundRect ? x.roundRect(lx, y, 40, 40, 11) : x.rect(lx, y, 40, 40); x.clip(); x.drawImage(im, lx, y, 40, 40); x.restore(); } }
+    else { x.fillStyle = s.color; x.beginPath(); x.roundRect ? x.roundRect(lx, y, 40, 40, 11) : x.rect(lx, y, 40, 40); x.fill(); x.fillStyle = '#fff'; x.font = '800 20px system-ui,sans-serif'; x.textAlign = 'center'; x.fillText((s.name.trim()[0]||'M').toUpperCase(), lx+20, y+27); }
+    lx += 46;
+  }
+  x.textAlign = 'left'; x.fillStyle = '#1c1b1a'; x.font = '700 17px system-ui,-apple-system,sans-serif';
+  x.fillText(vis.map(s => s.name).join(' · ') || 'Карта замовлень', lx + 6, H + 34);
+  x.fillStyle = '#6b6560'; x.font = '13px system-ui,-apple-system,sans-serif';
+  x.fillText(`${$('kOrders').textContent} замовлень · ${$('kCities').textContent} міст · ${$('kCountries').textContent} країн · ${$('kRev').title || ''} · ${rangeLabel()}`, lx + 6, H + 56);
+  try {
+    c.toBlob(b => { if (!b) return toast('Не вдалося створити зображення.', 4000); download(b, `etsy-map-${isoDay(new Date())}.png`); toast('Зображення збережено.', 2500); }, 'image/png');
+  } catch { toast('Браузер заблокував зображення мапи. Спробуйте ще раз після повного завантаження мапи.', 5000); }
+}
+
+// ================= loading orders into a shop (merges, no duplicates) =================
+const runs = {};
+async function loadInto(shop, rows) {
+  const run = (runs[shop.id] = (runs[shop.id]||0) + 1);
+  if (selected?.shop === shop) closeSheet();
+  shop.loading = 'Обробка файлу…'; shop.visible = true; renderShops();
+  // 1) rows → orders; rows of the same order (one row per item) are combined
+  const incoming = new Map(); let k = 0;
+  for (const n of rows.map(normalize)) {
+    if (!n.city && !n.country && n.lat == null) continue;
+    const key = n.order.id ? 'id:' + n.order.id : 'row:' + (k++);
+    const ex = incoming.get(key);
+    if (ex) { ex.order.items.push(...n.order.items); ex.order.itemsCount = (ex.order.itemsCount||0) + (n.order.itemsCount||0); if (n.order.itemLevel && n.order.total != null) ex.order.total = (ex.order.total||0) + n.order.total; }
+    else incoming.set(key, { loc:n, order:n.order });
+  }
+  // 2) merge into existing data: same order id → update, same signature without id → skip
+  const sig = o => [o.date, o.buyer, o.total].join('|');
+  const places = new Map(), byId = new Map(), sigs = new Set();
+  shop.places.forEach(p => { p.key ||= placeKey(p); places.set(p.key, p); p.orders.forEach(o => { if (o.id) byId.set(o.id, p); else sigs.add(sig(o)); }); });
+  let added = 0, updated = 0, dup = 0;
+  for (const { loc, order } of incoming.values()) {
+    let pk = placeKey(loc), place = places.get(pk);
+    if (!place) { place = { key:pk, city:loc.city, state:loc.state, country:loc.country, lat:loc.lat, lng:loc.lng, orders:[] }; places.set(pk, place); }
+    if (order.id && byId.has(order.id)) {
+      const old = byId.get(order.id), i = old.orders.findIndex(o => o.id === order.id), merged = mergeOrder(old.orders[i], order);
+      if (old === place) old.orders[i] = merged; else { old.orders.splice(i, 1); place.orders.push(merged); byId.set(order.id, place); }
+      updated++;
+    } else if (!order.id && sigs.has(sig(order))) dup++;
+    else { place.orders.push(order); if (order.id) byId.set(order.id, place); added++; }
+  }
+  shop.places = [...places.values()].filter(p => p.orders.length);
+  computeRepeat(shop); refresh(false);
+  // 3) geocode new cities
+  const todo = shop.places.filter(p => p.lat == null);
+  for (let i = 0; i < todo.length; i++) {
+    if (runs[shop.id] !== run) return;
+    const p = todo[i]; shop.loading = `Шукаю міста на мапі ${i+1}/${todo.length}…`; renderShops();
+    const c = await geocode(p); if (c) { p.lat = c[0]; p.lng = c[1]; }
+    if (i % 3 === 0 || i === todo.length-1) redraw(false);
+  }
+  if (runs[shop.id] !== run) return;
+  const lost = shop.places.filter(p => p.lat == null); const unplaced = lost.reduce((s,p) => s + p.orders.length, 0);
+  shop.places = shop.places.filter(p => p.lat != null);
+  computeRepeat(shop); shop.loading = false; await saveData(shop);
+  const parts = [`+${added} нових`]; if (updated) parts.push(`${updated} оновлено`); if (dup) parts.push(`${dup} дублів пропущено`); if (unplaced) parts.push(`${unplaced} не знайдено на мапі`);
+  toast(`«${shop.name}»: ${parts.join(', ')}.`, 6000);
+  renderShops(); refresh(true);
+}
+async function loadFile(f) {
+  const shop = activeShop(); const t = await f.text(); let data;
+  try { data = f.name.toLowerCase().endsWith('.json') ? JSON.parse(t) : parseCSV(t); } catch (e) { return toast('Не вдалося прочитати файл: ' + e.message, 5000); }
+  if (!Array.isArray(data) || !data.length) return toast('У файлі немає замовлень.', 4000);
+  loadInto(shop, data);
+}
+$('file').onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value=''; };
+document.body.ondragover = e => { e.preventDefault(); document.body.classList.add('drop'); };
+document.body.ondragleave = e => { if (!e.relatedTarget) document.body.classList.remove('drop'); };
+document.body.ondrop = e => { e.preventDefault(); document.body.classList.remove('drop'); e.dataTransfer.files[0] && loadFile(e.dataTransfer.files[0]); };
+$('clear').onclick = () => { cache = {}; kv.set('geo', cache); toast('Кеш геокодингу очищено.', 2000); };
+
+// ================= boot (moves data from the older localStorage format into IndexedDB) =================
+(async function boot() {
+  let meta = await kv.get('shops');
+  if (!meta) {
+    let old = null; try { old = JSON.parse(ls.get('etsyShops') || 'null'); } catch {}
+    if (old?.length) {
+      let ok = true;
+      for (const s of old) { let d = []; try { d = JSON.parse(ls.get('etsyShopData:'+s.id) || '[]'); } catch {} ok = (await kv.set('data:'+s.id, d)) && ok; }
+      try { const g = JSON.parse(ls.get('etsyGeoCache') || 'null'); if (g) ok = (await kv.set('geo', g)) && ok; } catch {}
+      ok = (await kv.set('shops', old)) && ok;
+      if (ok) ['etsyShops','etsyGeoCache','etsyBrand', ...old.map(s => 'etsyShopData:'+s.id)].forEach(ls.del);
+      meta = old;
+    }
+  }
+  if (!meta?.length) {
+    let b = {}; try { b = JSON.parse(ls.get('etsyBrand') || '{}'); } catch {}
+    meta = [{ id:uid(), name:b.name || 'Мій Etsy-магазин', logo:b.logo || '', color:COLORS[0], visible:true }];
+  }
+  shops = meta;
+  for (const s of shops) { s.places = (await kv.get('data:'+s.id)) || []; s.visible = s.visible !== false; s.loading = false; s.places.forEach(p => p.key ||= placeKey(p)); computeRepeat(s); }
+  cache = (await kv.get('geo')) || {};
+  activeId = shops[0].id; saveShops();
+  syncTopButtons(); renderShops(); syncUploadLabel(); renderRangeUI(); refresh(true);
+})();
+</script>
+</body>
+</html>
