@@ -301,8 +301,31 @@
   #tlBox span { color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; }
   #tlBox .ib { font-size:18px; font-weight:700; }
   #tlPlay { background:var(--accent-soft); color:var(--accent) !important; }
-  #tlSpeed { border:1px solid var(--line); background:var(--solid); color:var(--fg); border-radius:9px; font:inherit; font-size:12px; padding:4px 6px; cursor:pointer; }
-  #tlRange { width:100%; margin:2px 0 0; accent-color:var(--accent); cursor:pointer; }
+  /* speed: a pill; hovering (or tapping) it smoothly opens a small menu of speeds above it */
+  .tl-sp { position:relative; flex:none; }
+  .tl-menu { position:absolute; right:0; bottom:calc(100% + 10px); min-width:136px; padding:5px; display:flex; flex-direction:column; gap:1px; border-radius:14px; background:var(--solid); border:1px solid var(--line); box-shadow:var(--shadow);
+    opacity:0; transform:translateY(8px) scale(.95); transform-origin:bottom right; pointer-events:none; transition:opacity .18s ease, transform .18s cubic-bezier(.2,.9,.3,1.2); }
+  .tl-menu::after { content:""; position:absolute; left:0; right:0; top:100%; height:12px; } /* hover bridge to the pill */
+  .tl-sp:hover .tl-menu, .tl-sp.open .tl-menu { opacity:1; transform:none; pointer-events:auto; }
+  .tl-sp.hold .tl-menu { opacity:0; transform:translateY(8px) scale(.95); pointer-events:none; }
+  .tl-menu button { display:flex; align-items:center; gap:8px; border:0; background:transparent; padding:7px 10px; border-radius:9px; cursor:pointer; font-size:13px; color:var(--fg); text-align:left; white-space:nowrap; }
+  .tl-menu button:hover { background:var(--hover); }
+  .tl-menu button b { min-width:22px; font-variant-numeric:tabular-nums; }
+  .tl-menu button.on { background:var(--accent-soft); color:var(--accent); font-weight:700; }
+  .tl-menu button.on::after { content:"✓"; margin-left:auto; }
+  #tlSpeed { display:inline-flex; align-items:center; gap:5px; flex:none; border:0; border-radius:99px; padding:5px 11px 5px 8px; cursor:pointer; background:var(--hover); color:var(--muted); font-size:12px; font-weight:600; transition:background .15s, color .15s; }
+  #tlSpeed:hover { background:var(--accent-soft); color:var(--accent); }
+  #tlSpeed b { color:var(--fg); font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; }
+  #tlSpeed:hover b { color:var(--accent); }
+  #tlSpeed svg { opacity:.8; }
+  #tlSpeed.bump b { animation:tlBump .25s; }
+  @keyframes tlBump { 50% { transform:scale(1.25); } }
+  /* slider: thin light track, accent fill up to the current day, white knob */
+  #tlRange { -webkit-appearance:none; appearance:none; width:100%; height:6px; margin:6px 0 2px; border-radius:99px; cursor:pointer; outline:none;
+    background:linear-gradient(90deg, var(--accent2), var(--accent) var(--p, 0%), color-mix(in srgb, var(--muted) 22%, transparent) var(--p, 0%)); }
+  #tlRange::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:#fff; border:3px solid var(--accent); box-shadow:0 1px 4px rgba(0,0,0,.25); }
+  #tlRange::-moz-range-thumb { width:12px; height:12px; border-radius:50%; background:#fff; border:3px solid var(--accent); box-shadow:0 1px 4px rgba(0,0,0,.25); }
+  #tlRange:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 4px var(--accent-soft); }
   @media (min-width:701px) and (max-width:1180px) { #tlBox { bottom:176px; } }
 
   @media (max-width:700px) {
@@ -411,7 +434,7 @@
     <button class="ib" id="tlPlay"></button>
     <button class="ib" id="tlNext" title="Наступний день (→)">›</button>
     <div class="tl-mid"><b id="tlDate"></b><span id="tlCount"></span></div>
-    <select id="tlSpeed" title="Швидкість"></select>
+    <div class="tl-sp" id="tlSp"><button id="tlSpeed" aria-haspopup="true" aria-label="Швидкість"></button><div class="tl-menu" id="tlMenu" role="menu"></div></div>
     <button class="ib" id="tlStop" title="Закрити таймлапс">✕</button>
   </div>
   <input type="range" id="tlRange" min="0" max="0" value="0" aria-label="День таймлапсу">
@@ -1383,11 +1406,21 @@ function monthsOf(entries) {
   return out.slice(-48);
 }
 const monthEnd = k => { const [y,m] = k.split('-').map(Number); return isoDay(new Date(y, m, 0)); };
-// timelapse player: orders appear day by day (default 1 day per second); pause keeps the current day,
+// timelapse player: orders appear day by day (default 2 days per second); pause keeps the current day,
 // the slider / mouse wheel / ← → move between days, ✕ closes and brings back the previous period
-const TL_SPEEDS = [[.5,'½ дня/с'],[1,'1 день/с'],[2,'2 дні/с'],[5,'5 днів/с'],[10,'10 днів/с'],[30,'30 днів/с']];
-let playSaved = null, tl = null, tlSpeed = TL_SPEEDS.some(x => x[0] === +ls.get('etsyTlSpeed')) ? +ls.get('etsyTlSpeed') : 1;
-$('tlSpeed').innerHTML = TL_SPEEDS.map(([v,l]) => `<option value="${v}"${v === tlSpeed ? ' selected' : ''}>${l}</option>`).join('');
+const TL_SPEEDS = [[1,'1'],[2,'2'],[5,'5'],[10,'10'],[30,'30']];
+let playSaved = null, tl = null, tlSpeed = TL_SPEEDS.some(x => x[0] === +ls.get('etsyTlSpeed2')) ? +ls.get('etsyTlSpeed2') : 2;
+function syncSpeed() {
+  const l = TL_SPEEDS.find(x => x[0] === tlSpeed)[1];
+  $('tlMenu').innerHTML = TL_SPEEDS.slice().reverse().map(([v,l]) => `<button role="menuitemradio" data-v="${v}" class="${v === tlSpeed ? 'on' : ''}"><b>${l}</b>${v < 1 ? 'дня' : v === 1 ? 'день' : v < 5 ? 'дні' : 'днів'} / сек</button>`).join('');
+  $('tlSpeed').innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg><b>${l}</b>${tlSpeed < 1 ? 'дня/с' : tlSpeed === 1 ? 'день/с' : 'дн/с'}`;
+}
+function setSpeed(v) {
+  tlSpeed = v; ls.set('etsyTlSpeed2', String(tlSpeed)); syncSpeed();
+  $('tlSpeed').classList.remove('bump'); void $('tlSpeed').offsetWidth; $('tlSpeed').classList.add('bump');
+  if (playTimer) resumePlay();
+}
+syncSpeed();
 function tlShow(i) {
   if (!tl) return;
   tl.i = Math.max(0, Math.min(tl.days - 1, i));
@@ -1397,7 +1430,7 @@ function tlShow(i) {
   const endMs = +new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
   $('tlDate').textContent = day.toLocaleDateString('uk-UA', { day:'numeric', month:'long', year:'numeric' });
   $('tlCount').textContent = `${tl.ts.filter(t => t < endMs).length} замовлень`;
-  $('tlRange').value = tl.i;
+  $('tlRange').value = tl.i; $('tlRange').style.setProperty('--p', (tl.days > 1 ? tl.i / (tl.days - 1) * 100 : 100) + '%');
   if (sheet === 'stats') { const mk = monthKey(+day); if (mk !== tl.mk) { tl.mk = mk; renderStats(mk); } }
   else if (sheet === 'list') renderList();
   else if (sheet === 'money') renderMoney();
@@ -1441,7 +1474,13 @@ $('tlPrev').onclick = () => { pausePlay(); tlShow(tl.i - 1); };
 $('tlNext').onclick = () => { pausePlay(); tlShow(tl.i + 1); };
 $('tlStop').onclick = () => stopPlay();
 $('tlRange').oninput = e => { pausePlay(); tlShow(+e.target.value); };
-$('tlSpeed').onchange = e => { tlSpeed = +e.target.value; ls.set('etsyTlSpeed', String(tlSpeed)); if (playTimer) resumePlay(); };
+$('tlSpeed').onclick = () => $('tlSp').classList.toggle('open'); // touch screens have no hover
+$('tlMenu').onclick = e => {
+  const b = e.target.closest('[data-v]'); if (!b) return;
+  setSpeed(+b.dataset.v); $('tlSp').classList.remove('open'); $('tlSp').classList.add('hold'); // close until the pointer leaves
+};
+$('tlSp').onmouseleave = () => $('tlSp').classList.remove('hold');
+document.addEventListener('click', e => { if (!e.target.closest('#tlSp')) $('tlSp').classList.remove('open'); });
 let tlWheel = 0; // trackpads send many small deltas: one day per ~40px
 $('tlBox').addEventListener('wheel', e => {
   if (!tl) return; e.preventDefault();
@@ -1630,7 +1669,8 @@ function periodBounds(k, n = new Date()) {
   if (k === 'quarter') { const q = Math.floor(m/3)*3; return [+new Date(y, q, 1), +new Date(y, q+3, 1)]; }
   return [+new Date(y, m, 1), +new Date(y, m+1, 1)];
 }
-const periodName = (k, b) => { const d = new Date(b[0]); return k === 'year' ? String(d.getFullYear()) : k === 'quarter' ? `${Math.floor(d.getMonth()/3)+1} кв. ${d.getFullYear()}` : monthLabel(monthKey(b[0])); };
+const periodName = (k, b) => { const d = new Date(b[0]); return k === 'year' ? String(d.getFullYear()) : k === 'quarter' ? `${Math.floor(d.getMonth()/3)+1} кв. ${d.getFullYear()}` : `${MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}`; };
+const MONTHS_FULL = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const curSymbol = c => fmtMoney(0, c).replace(/[\d.,\s]/g, '') || c;
 const convTo = (v, from, to) => from === to ? v : rates?.[from] && rates?.[to] ? v / rates[from] * rates[to] : null;
 let ratesTry = null;
