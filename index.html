@@ -69,6 +69,13 @@
   .shop .s { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .shop .dotc { width:9px; height:9px; border-radius:50%; background:var(--c); display:inline-block; margin-right:5px; }
   .shop .acts { display:flex; gap:0; flex:none; }
+  /* reorder handle: drag a shop up or down (mouse and touch) */
+  .shop .grip { flex:none; width:14px; margin:0 -6px 0 -4px; align-self:stretch; display:grid; place-items:center; color:var(--muted); opacity:0; cursor:grab; touch-action:none; transition:opacity .15s; }
+  .shop:hover .grip, .shop.dragging .grip { opacity:.7; }
+  @media (hover:none) { .shop .grip { opacity:.45; } }
+  .shop.dragging { background:var(--solid); box-shadow:var(--shadow); position:relative; z-index:2; cursor:grabbing; }
+  .shop.dragging .grip { cursor:grabbing; }
+  body.reordering, body.reordering * { cursor:grabbing !important; user-select:none; }
   .shop .acts .ib { width:30px; height:30px; }
   .shop .acts .ib:hover { color:var(--c); }
 
@@ -164,6 +171,12 @@
   .order .pr small { display:block; color:var(--muted); font-weight:500; font-size:11.5px; }
   .order .pr s.old { display:block; color:var(--muted); font-weight:500; font-size:12px; }
   .order .pr .disc { display:inline-block; margin-top:3px; font-size:11px; font-weight:700; color:var(--good); background:color-mix(in srgb, var(--good) 15%, transparent); padding:1px 7px; border-radius:99px; }
+  .badge.rv { background:color-mix(in srgb, #e0a800 18%, transparent); color:#b98a00; cursor:help; }
+  :root[data-theme="dark"] .badge.rv { color:#f0c34a; }
+  .rv-row { padding:8px 4px; border-bottom:1px solid var(--line); font-size:13px; cursor:pointer; border-radius:8px; }
+  .rv-row:hover { background:var(--hover); }
+  .rv-row .st { color:#e0a800; letter-spacing:1px; }
+  .rv-row .mm { color:var(--muted); font-size:12px; }
   .badge { display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:99px; background:color-mix(in srgb, var(--c, var(--accent)) 16%, transparent); color:var(--c, var(--accent)); margin-left:4px; white-space:nowrap; }
   .empty { color:var(--muted); padding:16px 8px; text-align:center; }
 
@@ -410,6 +423,7 @@
       <button class="ib" id="exportBtn" title="Експорт і дані"></button>
       <div id="exportMenu" class="glass">
         <button id="expPng">🖼 Зображення мапи (PNG)<small>Для поста чи звіту, з назвою магазину</small></button>
+        <button id="expReport">📊 Звіт за період (PNG)<small>Цифри, мапа, топ товарів і регіонів — для себе чи бухгалтера</small></button>
         <button id="expCsv">📄 Замовлення (CSV)<small>Лише ті, що зараз видно на мапі</small></button>
         <button id="expShare" class="own-only">🔗 Посилання для перегляду<small>Мапа без імен покупців — для друзів</small></button>
         <button id="expInstall">📲 Встановити як застосунок<small>Іконка на телефоні чи в Dock, відкривається без інтернету</small></button>
@@ -498,7 +512,7 @@ const kv = (() => {
 // ================= shops =================
 let shops = [], activeId = null;
 const uid = () => 's' + Math.random().toString(36).slice(2,9);
-const shopMeta = ({places, loading, ledger, ...m}) => m;
+const shopMeta = ({places, loading, ledger, reviews, ...m}) => m;
 function saveShops() { kv.set('shops', shops.map(shopMeta)); }
 async function saveData(s) { if (!await kv.set('data:'+s.id, s.places)) toast('Не вдалося зберегти дані в браузері — після перезавантаження їх треба буде додати знову.', 6000); }
 const shopById = id => shops.find(s => s.id===id);
@@ -562,9 +576,12 @@ function renderShops() {
   shops.forEach(s => {
     const el = document.createElement('div'); el.className = 'shop'+(s.id===activeId && !viewOnly ?' active':''); el.style.setProperty('--c', s.color);
     const n = nOrders(s);
-    el.innerHTML = `${avatarHTML(s)}<div class="t"><div class="n">${esc(s.name)}</div><div class="s">${s.loading ? '⏳ '+esc(s.loading) : n ? `<span class="dotc"></span>${n} замовлень · ${s.places.length} міст${s.ledger?.length ? ' · виписка ✓' : ''}` : 'Немає даних — завантажте CSV'}</div></div>
+    el.dataset.id = s.id;
+    const grip = shops.length > 1 && !viewOnly ? `<span class="grip" title="Перетягніть, щоб змінити порядок"><svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></span>` : '';
+    el.innerHTML = `${grip}${avatarHTML(s)}<div class="t"><div class="n">${esc(s.name)}</div><div class="s">${s.loading ? '⏳ '+esc(s.loading) : n ? `<span class="dotc"></span>${n} замовлень · ${s.places.length} міст${s.ledger?.length ? ' · виписка ✓' : ''}` : 'Немає даних — завантажте CSV'}</div></div>
       <div class="acts"><button class="ib" data-a="up" title="Завантажити замовлення">${ICON.up}</button><button class="ib" data-a="edit" title="Редагувати">${ICON.edit}</button><button class="ib${s.visible?'':' off'}" data-a="eye" title="${s.visible?'Сховати піни магазину':'Показати піни магазину'}">${s.visible?ICON.pin:ICON.pinOff}</button></div>`;
     el.onclick = e => {
+      if (e.target.closest('.grip')) return;
       const a = e.target.closest('button')?.dataset.a;
       activeId = s.id;
       if (a==='up') $('file').click();
@@ -575,6 +592,33 @@ function renderShops() {
     box.appendChild(el);
   });
 }
+// drag the ⋮⋮ handle to reorder shops: rows swap live under the pointer, the order is saved on release
+$('shopList').addEventListener('pointerdown', e => {
+  const g = e.target.closest('.grip'); if (!g || e.button > 0) return;
+  e.preventDefault();
+  const box = $('shopList'), el = g.closest('.shop'), y0 = e.clientY; let moved = false;
+  el.classList.add('dragging'); document.body.classList.add('reordering'); g.setPointerCapture(e.pointerId);
+  const move = ev => {
+    if (Math.abs(ev.clientY - y0) > 3) moved = true;
+    const sib = [...box.children].filter(x => x !== el);
+    const after = sib.find(x => { const r = x.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
+    if (after ? el.nextElementSibling !== after : box.lastElementChild !== el) box.insertBefore(el, after || null);
+    // keep the list scrolling when dragging near its edges
+    const r = box.getBoundingClientRect(); if (ev.clientY < r.top + 20) box.scrollTop -= 8; else if (ev.clientY > r.bottom - 20) box.scrollTop += 8;
+  };
+  const up = () => {
+    g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up);
+    el.classList.remove('dragging'); document.body.classList.remove('reordering');
+    const order = [...box.children].map(x => x.dataset.id);
+    if (moved && order.join() !== shops.map(s => s.id).join()) {
+      shops.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+      saveShops(); renderShops(); refresh(false);
+    }
+  };
+  g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+});
+
+
 function syncUploadLabel() { if (activeShop()) $('uploadBtn').textContent = `📂 Завантажити для «${activeShop().name}»`; }
 $('uploadBtn').onclick = () => $('file').click();
 
@@ -699,6 +743,14 @@ const views = { world:{c:[25,10],z:2}, usa:{c:[39.5,-98.5],z:4} };
 document.querySelectorAll('#view button').forEach(b => b.onclick = () => { document.querySelectorAll('#view button').forEach(x=>x.classList.toggle('on',x===b)); map.setView(views[b.dataset.v].c, views[b.dataset.v].z); });
 
 // ================= parsing =================
+// Etsy writes some characters as HTML codes in its CSVs (&quot; &#39; &amp; …) — turn them back into text
+const ENT = { quot:'"', amp:'&', apos:"'", lt:'<', gt:'>', nbsp:' ' };
+function unent(v) {
+  if (typeof v !== 'string' || !v.includes('&')) return v;
+  for (let i = 0; i < 2 && /&(#x[0-9a-f]+|#\d+|quot|amp|apos|lt|gt|nbsp);/i.test(v); i++) // twice: "&amp;quot;" → "&quot;" → '"'
+    v = v.replace(/&(#x[0-9a-f]+|#\d+|quot|amp|apos|lt|gt|nbsp);/gi, (m, e) => e[0] === '#' ? String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : +e.slice(1)) : ENT[e.toLowerCase()]);
+  return v;
+}
 function parseCSV(text) {
   const rows=[]; let row=[], cur='', q=false;
   for (let i=0;i<text.length;i++){
@@ -711,7 +763,7 @@ function parseCSV(text) {
   }
   if(cur!==''||row.length){ row.push(cur); rows.push(row); }
   const head = (rows.shift()||[]).map(h=>h.trim().toLowerCase().replace(/^﻿/,''));
-  return rows.map(r => Object.fromEntries(head.map((h,i)=>[h,(r[i]||'').trim()])));
+  return rows.map(r => Object.fromEntries(head.map((h,i)=>[h,unent((r[i]||'').trim())])));
 }
 const pick = (o, keys) => { for (const k of keys) if (o[k]!==undefined && o[k]!==null && o[k]!=='') return o[k]; return ''; };
 const regionNames = (()=>{ try { return new Intl.DisplayNames(['en'],{type:'region'}); } catch { return null; } })();
@@ -726,20 +778,21 @@ function normalize(o) {
   // items → [{t: title, id: listing id}]; accepts the JSON from fetch-etsy.mjs, Etsy CSVs and this page's own CSV export
   let items = [];
   // p = line price before discount (price × quantity), d = discount on that line, q = quantity
-  if (Array.isArray(o.items)) items = o.items.map(i => typeof i==='string' ? {t:i} : { t:i.title||i.t||'', id:String(i.listing_id||i.id||''), p: num(i.price ?? i.p), d: num(i.discount ?? i.d), q: num(i.quantity ?? i.q) });
-  else if (pick(o,['item name','title'])) items = [{ t:pick(o,['item name','title']), id:String(pick(o,['listing id','listing_id'])), p: num(pick(o,['item total'])), d: num(pick(o,['discount amount'])), q: num(pick(o,['quantity'])) }];
+  if (Array.isArray(o.items)) items = o.items.map(i => typeof i==='string' ? {t:unent(i)} : { t:unent(i.title||i.t||''), id:String(i.listing_id||i.id||''), p: num(i.price ?? i.p), d: num(i.discount ?? i.d), q: num(i.quantity ?? i.q), v: unent(String(i.variations ?? i.v ?? '')) });
+  else if (pick(o,['item name','title'])) items = [{ t:pick(o,['item name','title']), id:String(pick(o,['listing id','listing_id'])), p: num(pick(o,['item total'])), d: num(pick(o,['discount amount'])), q: num(pick(o,['quantity'])), v: String(pick(o,['variations'])) }];
   else if (pick(o,['items'])) { const ids = String(pick(o,['listing ids'])).split(' | '); items = String(o.items).split(' | ').map((t,i) => ({ t, id: ids[i] || '' })); }
   return {
     city: pick(o, ['city','ship city','shipping city']),
     state: pick(o, ['state','ship state','shipping state','state/province']),
     country: countryName(pick(o, ['country','country_iso','ship country','shipping country'])),
+    zip: String(pick(o, ['ship zipcode','ship zip','zipcode','zip','postal code','postal_code']) || '').trim(),
     lat: o.lat != null && o.lat !== '' ? +o.lat : null, lng: o.lng != null && o.lng !== '' ? +o.lng : null,
     order: {
       id: String(pick(o, ['order id','id','receipt_id'])),
       date: pick(o, ['sale date','date','created']),
       itemsCount: num(pick(o, ['number of items','items_count','quantity'])) ?? (items.length || null),
       items,
-      buyer: pick(o, ['full name','ship name','name','buyer']),
+      buyer: unent(pick(o, ['full name','ship name','name','buyer'])),
       total: num(pick(o, ['order total','order value','total','item total'])),
       itemLevel: !pick(o, ['order total','order value','total']) && !!pick(o, ['item total']),
       // order-wide discount (coupon/sale) from "Sold Orders"; item rows carry their own in items[].d
@@ -773,6 +826,12 @@ function linePaid(it, o) {
   const share = !its.some(x => x.d > 0) && o.discount > 0 && it.p > 0 && sumP > 0 ? o.discount * it.p / sumP : 0;
   const disc = Math.min(it.d > 0 ? it.d : share, it.p);
   return { p:it.p, disc, paid:it.p - disc };
+}
+// "Color:Red,Size:Large,Personalization:Anna" → [['Color','Red'],['Size','Large']] (free-text personalisation is skipped)
+function varsOf(it) {
+  if (!it.v) return [];
+  return String(it.v).split(/,(?=[^,:]+:)/).map(x => { const i = x.indexOf(':'); return i > 0 ? [x.slice(0, i).trim(), x.slice(i + 1).trim()] : null; })
+    .filter(x => x && x[1] && !/personali|персонал|note|notes|message|name to|custom text|engrav/i.test(x[0]) && x[1].length <= 60);
 }
 const orderDiscount = o => o.discount > 0 ? o.discount : itemsOf(o).reduce((s, it) => s + (it.d > 0 ? it.d : 0), 0);
 const shipDays = o => { const a = Date.parse(o.date), b = Date.parse(o.shipped); if (isNaN(a) || isNaN(b) || b < a - 864e5) return null; return Math.max(0, Math.round((b - a) / 864e5)); };
@@ -849,7 +908,7 @@ function parseLedger(rows) {
 }
 // statement rows of visible shops inside the period; with other filters only fees tied to visible orders count
 function ledgerEntries(b = rangeBounds()) {
-  const other = filt.q || filt.countries.size || filt.repeat || filt.item;
+  const other = filt.q || filt.countries.size || filt.repeat || filt.item || filt.vari;
   const ids = other ? new Set(visibleEntries(b).flatMap(e => e.orders.map(o => o.id))) : null;
   return shops.filter(s => s.visible).flatMap(s => (s.ledger || []).filter(r => {
     if (r.cat === 'deposit') return false;
@@ -906,25 +965,61 @@ async function loadLedger(shop, rows) {
   toast(`«${shop.name}»: виписка ${fmtDay(new Date(dates[0]))} — ${fmtDay(new Date(dates[dates.length-1]))}, +${added} рядків${dup ? `, ${dup} дублів пропущено` : ''}.`, 6000);
 }
 
+// ================= reviews (Shop Manager → Settings → Options → Download Data → Reviews CSV) =================
+const isReviews = rows => { const k = Object.keys(rows[0] || {}); return k.includes('star rating') || (k.includes('rating') && (k.includes('message') || k.includes('review'))); };
+// reviews are kept per shop by order id and copied onto the matching orders (also for orders loaded later)
+function applyReviews(shop) { shop.places.forEach(p => p.orders.forEach(o => { const r = o.id && shop.reviews?.[o.id]; if (r) o.review = r; else delete o.review; })); }
+async function loadReviews(shop, rows) {
+  shop.reviews ||= {}; let n = 0, noId = 0;
+  rows.forEach(r => {
+    const st = num(pick(r, ['star rating','rating','stars'])); if (st == null) return;
+    const id = String(pick(r, ['order id','receipt id','order']) || '').trim(); if (!id) { noId++; return; }
+    const t = Date.parse(pick(r, ['date reviewed','date','review date']));
+    shop.reviews[id] = { s:Math.max(1, Math.min(5, Math.round(st))), m:String(pick(r, ['message','review','text']) || '').trim(), d:isNaN(t) ? '' : new Date(t).toISOString(), by:String(pick(r, ['reviewer','buyer','name']) || '') }; n++;
+  });
+  if (!n) return toast('У файлі не знайдено відгуків з оцінкою й номером замовлення.', 5000);
+  applyReviews(shop); shop.visible = true;
+  await kv.set('reviews:' + shop.id, shop.reviews); await saveData(shop);
+  const matched = shop.places.reduce((t, p) => t + p.orders.filter(o => o.review).length, 0);
+  renderShops(); refresh(false);
+  toast(`«${shop.name}»: ${n} відгуків, ${matched} з них прив'язано до замовлень на мапі${noId ? ` · ${noId} без номера замовлення пропущено` : ''}.`, 6000);
+}
+const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+
 // ================= geocoding (Nominatim, one request per second, cached) =================
 let cache = {};
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 let geoChain = Promise.resolve();
-function geocode(p) {
-  const q = [p.city, p.state, p.country].filter(Boolean).join(', ');
-  if (cache[q] !== undefined) return Promise.resolve(cache[q]);
+// with a ZIP / postal code the pin goes to that postcode (exact even for towns with common names),
+// otherwise — or when the postcode is not found — to the city; p.geoBy remembers which one was used
+const ISO2 = c => { if (!c) return ''; if (/^[A-Z]{2}$/i.test(c)) return c.toUpperCase(); try { for (const k of 'AD AE AF AG AI AL AM AO AR AT AU AW AZ BA BB BD BE BG BH BM BN BO BR BS BY BZ CA CH CL CN CO CR CY CZ DE DK DO DZ EC EE EG ES FI FR GB GE GH GR GT HK HN HR HU ID IE IL IN IQ IS IT JM JO JP KE KR KW KZ LB LK LT LU LV MA MD MT MX MY NG NI NL NO NZ OM PA PE PH PK PL PR PT PY QA RO RS RU SA SE SG SI SK SV TH TN TR TT TW UA US UY UZ VE VN ZA'.split(' ')) if (countryName(k) === c) return k; } catch {} return ''; };
+function geoFetch(key, url) {
+  if (cache[key] !== undefined) return Promise.resolve(cache[key]);
   const job = geoChain.then(async () => {
-    if (cache[q] !== undefined) return cache[q];
+    if (cache[key] !== undefined) return cache[key];
     await sleep(1100);
-    try { const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q)); const j = await r.json(); cache[q] = j[0] ? [+j[0].lat, +j[0].lon] : null; } catch { return null; }
-    kv.set('geo', cache); return cache[q];
+    try { const r = await fetch(url); const j = await r.json(); cache[key] = j[0] ? [+j[0].lat, +j[0].lon] : null; } catch { return null; }
+    kv.set('geo', cache); return cache[key];
   });
   geoChain = job.catch(()=>{});
   return job;
 }
+async function geocode(p) {
+  const NOM = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&';
+  const cc = ISO2(p.country);
+  if (p.zip && cc) {
+    const z = String(p.zip).trim().replace(/^(\d{5})-\d{4}$/, '$1'); // US ZIP+4 → ZIP
+    const c = await geoFetch(`zip:${cc}:${z}`, NOM + 'postalcode=' + encodeURIComponent(z) + '&countrycodes=' + cc.toLowerCase());
+    if (c) { p.geoBy = 'zip'; return c; }
+  }
+  const q = [p.city, p.state, p.country].filter(Boolean).join(', ');
+  const c = await geoFetch(q, NOM + 'q=' + encodeURIComponent(q));
+  if (c) p.geoBy = 'city';
+  return c;
+}
 
 // ================= filters =================
-const filt = { q:'', countries:new Set(), range:'all', from:'', to:'', repeat:false, item:null, cmp: ls.get('etsyCmp') === 'yoy' ? 'yoy' : 'prev' };
+const filt = { q:'', countries:new Set(), range:'all', from:'', to:'', repeat:false, item:null, vari:null, cmp: ls.get('etsyCmp') === 'yoy' ? 'yoy' : 'prev' };
 let privacy = ls.get('etsyPrivacy') === '1';
 const RANGES = [['all','Увесь час'],['today','Сьогодні'],['yesterday','Вчора'],['week','Цей тиждень'],['month','Цей місяць'],['quarter','Цей квартал'],['year','Цей рік'],['custom','Свій період']];
 const parseDay = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
@@ -961,6 +1056,7 @@ function ordersFiltered(orders, b = rangeBounds()) {
   return orders.filter(o => {
     if (filt.repeat && !(o.of > 1)) return false;
     if (filt.item && !itemsOf(o).some(it => itemKey(it) === filt.item.k)) return false;
+    if (filt.vari && !itemsOf(o).some(it => varsOf(it).some(([k, v]) => k === filt.vari.k && v === filt.vari.v))) return false;
     if (!b) return true;
     const t = Date.parse(o.date); return !isNaN(t) && t >= b[0] && t < b[1];
   });
@@ -1029,9 +1125,10 @@ function buildFilterUI() {
     ? `<button class="chip on" id="itemChip" title="Прибрати фільтр">✕ ${esc(filt.item.t)}</button>`
     : '<span class="hint">Оберіть товар у 📊 Статистика → Товари, щоб побачити, де саме його купують.</span>';
   if ($('itemChip')) $('itemChip').onclick = () => setItemFilter(null);
+  if (filt.vari) { $('itemFilter').insertAdjacentHTML('beforeend', `<button class="chip on" id="variChip" title="Прибрати фільтр" style="margin-left:6px">✕ ${esc(filt.vari.k)}: ${esc(filt.vari.v)}</button>`); $('variChip').onclick = () => { filt.vari = null; refresh(true); }; }
 }
 $('q').oninput = e => { filt.q=e.target.value; refresh(true); };
-$('reset').onclick = () => { stopPlay(); Object.assign(filt, { q:'', range:'all', from:'', to:'', repeat:false, item:null }); filt.countries.clear(); $('q').value=''; renderRangeUI(); refresh(true); };
+$('reset').onclick = () => { stopPlay(); Object.assign(filt, { q:'', range:'all', from:'', to:'', repeat:false, item:null, vari:null }); filt.countries.clear(); $('q').value=''; renderRangeUI(); refresh(true); };
 $('fit').onclick = () => redraw(true);
 $('toggleFilters').onclick = () => $('filtersCard').classList.toggle('open');
 
@@ -1102,6 +1199,9 @@ $('perCapBtn').onclick = () => { perCap = !perCap; ls.set('etsyPerCap', perCap ?
 function drawRegions(vis) {
   const byCountry = new Map(), byState = new Map();
   vis.forEach(e => { const n = e.orders.length; byCountry.set(e.place.country, (byCountry.get(e.place.country)||0) + n); if (isUS(e.place.country)) { const sc = stateCode(e.place.state); if (sc) byState.set(sc, (byState.get(sc)||0) + n); } });
+  const rv = new Map(), addRv = (k, o) => { if (!o.review) return; const x = rv.get(k) || { s:0, n:0 }; x.s += o.review.s; x.n++; rv.set(k, x); };
+  vis.forEach(e => e.orders.forEach(o => { addRv('c:' + e.place.country, o); if (isUS(e.place.country)) addRv('s:' + stateCode(e.place.state), o); }));
+  const rvTxt = k => { const x = rv.get(k); return x ? `<br>★ ${(x.s / x.n).toFixed(1)} · ${x.n} відг.` : ''; };
   const pc = perCap && byState.size > 0, stVal = sc => pc ? (byState.get(sc) || 0) / (US[sc]?.[1] || 1) : (byState.get(sc) || 0);
   const max = Math.max(1, ...byCountry.values(), ...byState.values()), maxS = pc ? Math.max(.01, ...[...byState.keys()].map(stVal)) : max;
   const scale = (n, mx) => pc && mx === maxS ? n / mx : Math.log(1+n) / Math.log(1+mx);
@@ -1117,7 +1217,7 @@ function drawRegions(vis) {
     onEachFeature: (f, layer) => {
       const c = featureCountry(f.properties), n = byCountry.get(c) || 0;
       if (isUS(c) && byState.size) return;
-      layer.bindTooltip(`<b>${esc(c)}</b><br>${n} замовлень`, { sticky:true });
+      layer.bindTooltip(`<b>${esc(c)}</b><br>${n} замовлень${rvTxt('c:' + c)}`, { sticky:true });
       layer.on('click', ev => { L.DomEvent.stopPropagation(ev); if (n) { filt.countries = new Set([c]); refresh(true); } });
     },
   }).addTo(regionLayer);
@@ -1126,7 +1226,7 @@ function drawRegions(vis) {
     style: f => style(stVal(f.properties.postal), maxS),
     onEachFeature: (f, layer) => {
       const sc = f.properties.postal, n = byState.get(sc) || 0, per = US[sc] ? n / US[sc][1] : 0;
-      layer.bindTooltip(`<b>${esc(f.properties.name)}</b><br>${n} замовлень${n ? ` · ${per.toFixed(1)} на 1 млн жителів` : ''}`, { sticky:true });
+      layer.bindTooltip(`<b>${esc(f.properties.name)}</b><br>${n} замовлень${n ? ` · ${per.toFixed(1)} на 1 млн жителів` : ''}${rvTxt('s:' + sc)}`, { sticky:true });
       layer.on('click', ev => { L.DomEvent.stopPropagation(ev); map.fitBounds(layer.getBounds(), { maxZoom:6, padding:[40,40] }); });
     },
   }).addTo(regionLayer);
@@ -1146,7 +1246,7 @@ function redraw(fit=false) {
   if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
   $('legend').classList.remove('show');
   const vis = visibleEntries(), all = [];
-  $('toggleFilters').classList.toggle('active', !!(filt.q || filt.countries.size || filt.range!=='all' || filt.repeat || filt.item));
+  $('toggleFilters').classList.toggle('active', !!(filt.q || filt.countries.size || filt.range!=='all' || filt.repeat || filt.item || filt.vari));
   vis.forEach(e => all.push(...e.orders));
   if (display === 'regions') {
     if (regionsGeo) drawRegions(vis);
@@ -1253,6 +1353,7 @@ document.addEventListener('click', e => { if (!e.target.closest('#exportWrap')) 
 const menuAct = fn => () => { $('exportMenu').classList.remove('open'); fn(); };
 $('expPng').onclick = menuAct(() => exportPNG());
 $('expCsv').onclick = menuAct(() => exportCSV());
+$('expReport').onclick = menuAct(() => exportReport());
 $('expShare').onclick = menuAct(() => shareLink());
 $('expInstall').onclick = menuAct(() => installApp());
 $('expBackup').onclick = menuAct(() => exportBackup());
@@ -1306,7 +1407,8 @@ function orderRow(o, place, i) {
   const items = itemsOf(o);
   const titles = items.length ? items.map(listingLink).join('<br>') : esc(o.itemsCount ? `${o.itemsCount} товар(ів)` : 'Замовлення');
   const meta = [place ? '📍 ' + [place.city, place.country].filter(Boolean).join(', ') : '', !privacy && o.buyer ? '👤 '+o.buyer : '', fmtDate(o.date), o.id ? '#'+o.id : ''].filter(Boolean).map(esc).join(' · ');
-  const rep = o.of > 1 ? `<span class="badge" title="Повторний покупець">🔁 ${o.nth ? `${o.nth}-ге з ${o.of}` : 'повторний'}</span>` : '';
+  const rep = (o.of > 1 ? `<span class="badge" title="Повторний покупець">🔁 ${o.nth ? `${o.nth}-ге з ${o.of}` : 'повторний'}</span>` : '')
+    + (o.review ? `<span class="badge rv" data-tip="${esc(o.review.m ? (o.review.m.length > 140 ? o.review.m.slice(0, 140) + '…' : o.review.m) : 'Відгук без тексту')}">★ ${o.review.s}</span>` : '');
   return `<div class="order"${i != null ? ` data-i="${i}" style="cursor:pointer"` : ''}><div class="ic">🛍️</div><div class="mid"><div class="tt">${titles}</div><div class="mm">${meta}${rep}</div></div><div class="pr">${priceHTML(o.total, o.currency)}</div></div>`;
 }
 const rankHTML = rows => rows.length ? rows.map((r,i) => `<div class="rk${r.on?' on':''}" data-i="${i}"><div class="bar" style="width:${r.share*100}%"></div><span class="no">${i+1}</span><span class="nm">${r.name}${r.sub ? `<small>${r.sub}</small>` : ''}</span><span class="vl">${r.val}${r.rev ? `<small>${esc(r.rev)}</small>` : ''}</span></div>`).join('') : '<div class="empty">Немає даних</div>';
@@ -1603,6 +1705,35 @@ function renderStats(playingMonth) {
     rows = list.map(x => ({ name: listingLink(x.it), sub:`${x.cities.size} міст`, val:`${x.n}×`, share:x.n/mx, on: filt.item?.k === itemKey(x.it) }));
     note = list.length ? 'Натисніть на рядок, щоб показати на мапі лише покупців цього товару.' : (viewOnly ? 'Товари не передаються в посиланні для перегляду.' : 'Назви товарів є у файлі «Sold Order Items».');
     onPick = i => setItemFilter(filt.item?.k === itemKey(list[i].it) ? null : list[i].it);
+  } else if (statsTab === 'vars') {
+    const m = new Map();
+    vis.forEach(e => e.orders.forEach(o => itemsOf(o).forEach(it => varsOf(it).forEach(([k, v]) => {
+      const key = k + '\u0000' + v; if (!m.has(key)) m.set(key, { k, v, n:0, list:[], cities:new Set() });
+      const x = m.get(key); x.n += it.q || 1; x.cities.add(placeKey(e.place));
+      const lp = linePaid(it, o); if (lp.paid != null) x.list.push({ currency:o.currency || 'USD', v:lp.paid });
+    }))));
+    const list = [...m.values()].sort((a,b) => a.k.localeCompare(b.k) || b.n - a.n), byK = new Map();
+    list.forEach(x => byK.set(x.k, Math.max(byK.get(x.k) || 0, x.n)));
+    rows = list.map(x => { const a = moneyAgg(x.list, 'v'); return { name:esc(x.v), sub:esc(x.k) + ` · ${x.cities.size} міст`, val:`${x.n} шт.`, rev:a.n ? fmtMoney(a.v, a.cur) : '', share:x.n / byK.get(x.k), on: filt.vari?.k === x.k && filt.vari?.v === x.v }; });
+    note = list.length ? 'Колір, розмір та інші варіанти з колонки Variations. Натисніть, щоб показати на мапі, де купують саме цей варіант.' : (viewOnly ? 'Варіації не передаються в посиланні для перегляду.' : 'Немає варіацій. Вони беруться з колонки Variations у файлі «Sold Order Items» — завантажте його ще раз.');
+    onPick = i => { const x = list[i]; filt.vari = filt.vari?.k === x.k && filt.vari?.v === x.v ? null : { k:x.k, v:x.v }; refresh(true); };
+  } else if (statsTab === 'reviews') {
+    const all = []; vis.forEach(e => e.orders.forEach(o => { if (o.review) all.push({ o, e }); }));
+    const dist = [5,4,3,2,1].map(st => all.filter(x => x.o.review.s === st).length), avg = all.length ? all.reduce((t, x) => t + x.o.review.s, 0) / all.length : 0;
+    if (all.length) {
+      const mxd = Math.max(1, ...dist);
+      extra = `<div class="st-grid" style="margin-bottom:8px"><div class="m-stat"><b style="color:#e0a800">★ ${avg.toFixed(2)}</b><span>Середня оцінка</span></div><div class="m-stat"><b>${all.length}</b><span>Відгуків · ${Math.round(all.length / Math.max(1, orders.length) * 100)}% замовлень</span></div></div>`
+        + `<div class="chart" style="margin-top:4px">${dist.map((n, i) => `<div class="row" style="gap:8px;font-size:12px;margin:2px 0"><span style="width:28px;color:var(--muted)">${5 - i} ★</span><div style="flex:1;height:8px;border-radius:99px;background:var(--hover)"><div style="height:100%;width:${n / mxd * 100}%;border-radius:99px;background:#e0a800"></div></div><span style="width:26px;text-align:right">${n}</span></div>`).join('')}</div>`
+        + `<div class="m-h" style="padding-left:2px">Останні відгуки</div>`
+        + all.slice().sort((a,b) => (Date.parse(b.o.review.d || b.o.date) || 0) - (Date.parse(a.o.review.d || a.o.date) || 0)).slice(0, 6).map(x => `<div class="rv-row" data-rv="${esc(x.o.id)}"><span class="st">${stars(x.o.review.s)}</span> ${esc(x.o.review.m || 'Без тексту')}<div class="mm">${esc([privacy ? '' : x.o.buyer, x.e.place.city, fmtDate(x.o.review.d || x.o.date)].filter(Boolean).join(' · '))}</div></div>`).join('')
+        + `<div class="m-h" style="padding-left:2px">Оцінки за регіонами</div>`;
+    }
+    const m = new Map(); all.forEach(({ o, e }) => { const k = isUS(e.place.country) && stateName(e.place.state) ? stateName(e.place.state) : e.place.country || '—'; if (!m.has(k)) m.set(k, { k, s:0, n:0, e }); const x = m.get(k); x.s += o.review.s; x.n++; });
+    const reg = [...m.values()].sort((a,b) => b.n - a.n || b.s / b.n - a.s / a.n);
+    rows = reg.map(x => ({ name:esc(x.k), sub:`${x.n} відг.`, val:`★ ${(x.s / x.n).toFixed(1)}`, share:x.s / x.n / 5 }));
+    note = all.length ? '' : (viewOnly ? 'Відгуки не передаються в посиланні для перегляду.' : 'Відгуків ще немає. Etsy: Shop Manager → Settings → Options → Download Data → Reviews (CSV). Завантажте файл тут так само, як замовлення.');
+    onPick = i => focusEntry(reg[i].e);
+    after = () => $('sheet').querySelectorAll('[data-rv]').forEach(r => r.onclick = () => { const x = all.find(y => y.o.id === r.dataset.rv); if (x) focusEntry(x.e); });
   } else if (statsTab === 'speed') {
     const list = []; vis.forEach(e => e.orders.forEach(o => { const d = shipDays(o); if (d != null) list.push({ o, e, d }); }));
     list.sort((a,b) => b.d - a.d);
@@ -1619,7 +1750,7 @@ function renderStats(playingMonth) {
     note = list.length ? 'Середня вартість доставки й її частка в сумі замовлення.' : (viewOnly ? 'Дані про доставку не передаються в посиланні.' : 'Немає даних про доставку — завантажте файл «Sold Orders» (у ньому є колонка Shipping).');
     onPick = i => { filt.countries = new Set([list[i].c]); refresh(true); };
   }
-  const TABS = [['cities','Міста'],['countries','Країни'],['states','Штати США'],['buyers','Постійні клієнти'],['items','Товари'],['shipping','Доставка'],['speed','Час відправки']];
+  const TABS = [['cities','Міста'],['countries','Країни'],['states','Штати США'],['buyers','Постійні клієнти'],['items','Товари'],['vars','Варіації'],['reviews','Відгуки'],['shipping','Доставка'],['speed','Час відправки']];
   queueMicrotask(restore);
   $('sheet').innerHTML = `
     <div class="m-head"><div class="m-pin">📊</div>
@@ -1912,19 +2043,25 @@ const svgToImg = el => { // rasterise an inline <svg> exactly as it is laid out 
   cl.removeAttribute('style'); cl.setAttribute('xmlns','http://www.w3.org/2000/svg'); cl.setAttribute('width', r.width); cl.setAttribute('height', r.height);
   return loadImg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(cl)));
 };
-async function exportPNG() {
-  toast('Готую зображення…');
-  const cont = map.getContainer(), box = cont.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
-  const W = Math.round(box.width), H = Math.round(box.height), F = 76;
-  const c = document.createElement('canvas'); c.width = W*dpr; c.height = (H+F)*dpr;
-  const dark = theme === 'dark', P = dark ? { bg:'#1b1b1d', foot:'#252322', fg:'#f4efe9', mut:'#a49c94', attr:'rgba(255,255,255,.6)' } : { bg:'#e8e4de', foot:'#fff', fg:'#1c1b1a', mut:'#6b6560', attr:'rgba(0,0,0,.55)' };
-  const x = c.getContext('2d'); x.scale(dpr, dpr); x.fillStyle = P.bg; x.fillRect(0, 0, W, H);
+// the map exactly as it is on screen (tiles, regions, pins) drawn onto a canvas, CSS-pixel coordinates × dpr
+async function mapSnapshot(dpr) {
+  const cont = map.getContainer(), box = cont.getBoundingClientRect(), W = Math.round(box.width), H = Math.round(box.height);
+  const c = document.createElement('canvas'); c.width = W*dpr; c.height = H*dpr;
+  const x = c.getContext('2d'); x.scale(dpr, dpr); x.fillStyle = theme === 'dark' ? '#1b1b1d' : '#e8e4de'; x.fillRect(0, 0, W, H);
   const at = el => { const r = el.getBoundingClientRect(); return [r.left - box.left, r.top - box.top, r.width, r.height]; };
   cont.querySelectorAll('.leaflet-tile-pane img.leaflet-tile-loaded').forEach(img => { try { x.drawImage(img, ...at(img)); } catch {} });
   cont.querySelectorAll('.leaflet-overlay-pane canvas').forEach(cv => { try { x.drawImage(cv, ...at(cv)); } catch {} });
   for (const s of cont.querySelectorAll('.leaflet-overlay-pane svg')) { const im = await svgToImg(s); if (im) x.drawImage(im, ...at(s)); }
   const icons = [...cont.querySelectorAll('.leaflet-marker-pane .leaflet-marker-icon')].sort((a,b) => (+a.style.zIndex||0) - (+b.style.zIndex||0));
   for (const ic of icons) { const s = ic.querySelector('svg'); if (!s) continue; const im = await svgToImg(s); if (im) x.drawImage(im, ...at(s)); }
+  return { c, W, H };
+}
+async function exportPNG() {
+  toast('Готую зображення…');
+  const dpr = Math.min(2, window.devicePixelRatio || 1), snap = await mapSnapshot(dpr), W = snap.W, H = snap.H, F = 76;
+  const c = document.createElement('canvas'); c.width = W*dpr; c.height = (H+F)*dpr;
+  const dark = theme === 'dark', P = dark ? { bg:'#1b1b1d', foot:'#252322', fg:'#f4efe9', mut:'#a49c94', attr:'rgba(255,255,255,.6)' } : { bg:'#e8e4de', foot:'#fff', fg:'#1c1b1a', mut:'#6b6560', attr:'rgba(0,0,0,.55)' };
+  const x = c.getContext('2d'); x.drawImage(snap.c, 0, 0); x.scale(dpr, dpr);
   x.font = '11px system-ui,-apple-system,sans-serif'; x.fillStyle = P.attr; x.textAlign = 'right'; x.fillText('Tiles © Esri · Leaflet' + (display === 'regions' ? ' · Natural Earth' : ''), W - 8, H - 8);
   // footer with shop branding and current numbers
   x.fillStyle = P.foot; x.fillRect(0, H, W, F); x.fillStyle = '#f1641e'; x.fillRect(0, H, W, 3);
@@ -1946,10 +2083,76 @@ async function exportPNG() {
   } catch { toast('Браузер заблокував зображення мапи. Спробуйте ще раз після повного завантаження мапи.', 5000); }
 }
 
+// one image (1080×1350, fits Instagram too): numbers for the selected period, the map, top products and regions
+async function exportReport() {
+  const vis = visibleEntries(); if (!vis.length) return toast('Немає замовлень за цей період.', 3000);
+  toast('Готую звіт…');
+  const S = 1080, H = 1350, M = 56, dark = theme === 'dark';
+  const P = dark ? { bg:'#1e1d1c', card:'#2a2826', fg:'#f4efe9', mut:'#a49c94', line:'rgba(255,255,255,.08)' } : { bg:'#f6f3ef', card:'#ffffff', fg:'#1c1b1a', mut:'#6b6560', line:'rgba(0,0,0,.07)' };
+  const c = document.createElement('canvas'); c.width = S; c.height = H; const x = c.getContext('2d');
+  const F = (w, z) => `${w} ${z}px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif`;
+  const rr = (X, Y, w, h, r) => { x.beginPath(); x.roundRect ? x.roundRect(X, Y, w, h, r) : x.rect(X, Y, w, h); };
+  const fit = (t, w) => { t = String(t); if (x.measureText(t).width <= w) return t; while (t.length > 1 && x.measureText(t + '…').width > w) t = t.slice(0, -1); return t + '…'; };
+  x.fillStyle = P.bg; x.fillRect(0, 0, S, H);
+  const g = x.createLinearGradient(0, 0, S, 0); g.addColorStop(0, '#ff9a3c'); g.addColorStop(1, '#f1641e'); x.fillStyle = g; x.fillRect(0, 0, S, 10);
+  // header: logos + names + period
+  const vs = shops.filter(s => s.visible); let lx = M;
+  for (const s of vs.slice(0, 3)) {
+    if (blurNames || !s.logo) { x.fillStyle = s.color; rr(lx, 44, 72, 72, 20); x.fill(); if (!blurNames) { x.fillStyle = '#fff'; x.font = F(800, 36); x.textAlign = 'center'; x.fillText((s.name.trim()[0] || 'M').toUpperCase(), lx + 36, 93); } }
+    else { const im = await loadImg(s.logo); if (im) { x.save(); rr(lx, 44, 72, 72, 20); x.clip(); x.drawImage(im, lx, 44, 72, 72); x.restore(); } }
+    lx += 84;
+  }
+  const om = oneMonth(), period = om ? `${MONTHS_FULL[+om.slice(5) - 1]} ${om.slice(0, 4)}` : rangeLabel();
+  x.textAlign = 'left'; x.fillStyle = P.fg; x.font = F(800, 38); x.fillText(fit(blurNames ? 'Звіт магазину' : vs.map(s => s.name).join(' · ') || 'Звіт', S - lx - M), lx + 6, 78);
+  x.fillStyle = P.mut; x.font = F(500, 26); x.fillText(fit(`Звіт · ${period}${filt.item ? ' · ' + filt.item.t : ''}`, S - lx - M), lx + 6, 114);
+  // KPI tiles (same numbers as on screen)
+  const all = vis.flatMap(e => e.orders), agg = moneyAgg(all), withRv = all.filter(o => o.review);
+  const tiles = [[$('kOrders').textContent, 'Замовлень'], [$('kRev').title || $('kRev').textContent, 'Дохід'], [$('kCities').textContent, 'Міст'], [$('kCountries').textContent, 'Країн'],
+    [agg.n ? fmtMoney(agg.v / agg.n, agg.cur) : '—', 'Середній чек'], [hasLedger() ? $('kCosts').title || $('kCosts').textContent : '—', 'Витрати'], [hasLedger() ? $('kProfit').title || $('kProfit').textContent : '—', 'Чистий прибуток'],
+    [withRv.length ? '★ ' + (withRv.reduce((t, o) => t + o.review.s, 0) / withRv.length).toFixed(1) : '—', 'Оцінка']];
+  const tw = (S - 2*M - 3*16) / 4, th = 104;
+  tiles.forEach(([v, l], i) => {
+    const tx = M + (i % 4) * (tw + 16), ty = 156 + Math.floor(i / 4) * (th + 16);
+    x.fillStyle = P.card; rr(tx, ty, tw, th, 22); x.fill();
+    x.fillStyle = l === 'Витрати' && v !== '—' ? '#e5484d' : l === 'Чистий прибуток' && v !== '—' ? (String(v).startsWith('-') ? '#e5484d' : '#1a9850') : l === 'Оцінка' && v !== '—' ? '#e0a800' : P.fg;
+    x.font = F(800, 34); x.textAlign = 'center'; x.fillText(fit(v, tw - 20), tx + tw/2, ty + 52);
+    x.fillStyle = P.mut; x.font = F(600, 18); x.fillText(l.toUpperCase(), tx + tw/2, ty + 84);
+  });
+  // map (cropped to fill the frame)
+  const my = 156 + 2*(th + 16) + 8, mh = 470, mw = S - 2*M;
+  const dpr = 2, snap = await mapSnapshot(dpr), sc = Math.max(mw / snap.W, mh / snap.H), sw = mw / sc, sh = mh / sc;
+  x.save(); rr(M, my, mw, mh, 26); x.clip();
+  x.drawImage(snap.c, (snap.W - sw) / 2 * dpr, (snap.H - sh) / 2 * dpr, sw * dpr, sh * dpr, M, my, mw, mh); x.restore();
+  // top products and regions
+  const ly = my + mh + 40, cw = (S - 2*M - 32) / 2;
+  const items = new Map(); vis.forEach(e => e.orders.forEach(o => itemsOf(o).forEach(it => { const k = itemKey(it); if (!k) return; const v = items.get(k) || { t:it.t || 'Лістинг', n:0 }; v.n += it.q || 1; items.set(k, v); })));
+  const topItems = [...items.values()].sort((a,b) => b.n - a.n).slice(0, 5).map(v => [v.t, v.n + ' шт.']);
+  const multi = new Set(vis.map(e => e.place.country)).size > 1, reg = new Map();
+  vis.forEach(e => { const k = !multi && isUS(e.place.country) && stateName(e.place.state) ? stateName(e.place.state) : e.place.country || '—'; reg.set(k, (reg.get(k) || 0) + e.orders.length); });
+  const topReg = [...reg].sort((a,b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => [k, n + ' зам.']);
+  [[topItems.length ? 'Топ товари' : 'Топ міста', topItems.length ? topItems : [...new Map(vis.map(e => [placeKey(e.place), e])).values()].sort((a,b) => b.orders.length - a.orders.length).slice(0, 5).map(e => [e.place.city || '—', e.orders.length + ' зам.'])],
+   [multi ? 'Топ країни' : 'Топ штати / регіони', topReg]].forEach(([title, list], col) => {
+    const cx = M + col * (cw + 32);
+    x.fillStyle = P.card; rr(cx, ly, cw, H - ly - 92, 22); x.fill();
+    x.textAlign = 'left'; x.fillStyle = P.mut; x.font = F(700, 19); x.fillText(title.toUpperCase(), cx + 24, ly + 42);
+    list.forEach(([name, val], i) => {
+      const ry = ly + 86 + i * 50;
+      x.fillStyle = '#f1641e'; x.font = F(800, 22); x.fillText(String(i + 1), cx + 24, ry);
+      x.fillStyle = P.fg; x.font = F(600, 23); x.fillText(fit(name, cw - 170), cx + 56, ry);
+      x.fillStyle = P.mut; x.font = F(600, 21); x.textAlign = 'right'; x.fillText(val, cx + cw - 24, ry); x.textAlign = 'left';
+    });
+    if (!list.length) { x.fillStyle = P.mut; x.font = F(500, 21); x.fillText('Немає даних', cx + 24, ly + 86); }
+  });
+  x.fillStyle = P.mut; x.font = F(500, 18); x.textAlign = 'left'; x.fillText(`Карта замовлень Etsy · ${fmtDay(new Date())}`, M, H - 40);
+  x.textAlign = 'right'; x.fillText('Tiles © Esri', S - M, H - 40);
+  try { c.toBlob(b => { if (!b) return toast('Не вдалося створити звіт.', 4000); download(b, `etsy-report-${om || isoDay(new Date())}.png`); toast('📊 Звіт збережено.', 2500); }, 'image/png'); }
+  catch { toast('Браузер заблокував зображення мапи. Спробуйте ще раз після повного завантаження мапи.', 5000); }
+}
+
 // ================= backup / restore =================
 const BACKUP_APP = 'etsy-orders-geo';
 function exportBackup() {
-  const data = { app:BACKUP_APP, version:1, exported:new Date().toISOString(), shops: shops.map(s => ({ ...shopMeta(s), places:s.places, ledger:s.ledger || [] })), geo:cache };
+  const data = { app:BACKUP_APP, version:1, exported:new Date().toISOString(), shops: shops.map(s => ({ ...shopMeta(s), places:s.places, ledger:s.ledger || [], reviews:s.reviews || {} })), geo:cache };
   const n = shops.reduce((t,s) => t + nOrders(s), 0);
   download(new Blob([JSON.stringify(data)], { type:'application/json' }), `etsy-map-backup-${isoDay(new Date())}.json`);
   toast(`💾 Збережено ${shops.length} магазин(и), ${n} замовлень. Файл містить імена покупців — зберігайте його приватно.`, 6000);
@@ -1958,9 +2161,9 @@ async function restoreBackup(data) {
   if (!Array.isArray(data?.shops) || !data.shops.length) return toast('Це не резервна копія карти замовлень.', 4000);
   const n = data.shops.reduce((t,s) => t + (s.places||[]).reduce((u,p) => u + (p.orders||[]).length, 0), 0);
   if (!confirm(`Відновити дані з копії від ${fmtDate(data.exported)}?\n\nУ копії: ${data.shops.length} магазин(и), ${n} замовлень.\nПоточні магазини й замовлення буде замінено.`)) return;
-  for (const s of shops) { await kv.del('data:'+s.id); await kv.del('ledger:'+s.id); }
-  shops = data.shops.map(s => ({ ...s, places: s.places || [], ledger: s.ledger || [], visible: s.visible !== false, loading:false }));
-  for (const s of shops) { s.places.forEach(p => p.key ||= placeKey(p)); computeRepeat(s); await saveData(s); await kv.set('ledger:'+s.id, s.ledger); }
+  for (const s of shops) { await kv.del('data:'+s.id); await kv.del('ledger:'+s.id); await kv.del('reviews:'+s.id); }
+  shops = data.shops.map(s => ({ ...s, places: s.places || [], ledger: s.ledger || [], reviews: s.reviews || {}, visible: s.visible !== false, loading:false }));
+  for (const s of shops) { s.places.forEach(p => p.key ||= placeKey(p)); computeRepeat(s); await saveData(s); await kv.set('ledger:'+s.id, s.ledger); await kv.set('reviews:'+s.id, s.reviews); }
   if (data.geo) { cache = { ...cache, ...data.geo }; kv.set('geo', cache); }
   activeId = shops[0].id; saveShops(); closeSheet();
   renderShops(); syncUploadLabel(); refresh(true);
@@ -2033,7 +2236,11 @@ async function loadInto(shop, rows) {
   let added = 0, updated = 0, dup = 0;
   for (const { loc, order } of incoming.values()) {
     let pk = placeKey(loc), place = places.get(pk);
-    if (!place) { place = { key:pk, city:loc.city, state:loc.state, country:loc.country, lat:loc.lat, lng:loc.lng, orders:[] }; places.set(pk, place); }
+    if (!place) { place = { key:pk, city:loc.city, state:loc.state, country:loc.country, zip:loc.zip || '', lat:loc.lat, lng:loc.lng, orders:[] }; places.set(pk, place); }
+    else if (loc.zip && !place.zip) { // a postcode arrived for a city placed earlier by name: place it again, more precisely
+      place.zip = loc.zip;
+      if (place.lat != null && place.geoBy !== 'zip') { place.regeo = [place.lat, place.lng]; place.lat = place.lng = null; }
+    }
     if (order.id && byId.has(order.id)) {
       const old = byId.get(order.id), i = old.orders.findIndex(o => o.id === order.id), merged = mergeOrder(old.orders[i], order);
       if (old === place) old.orders[i] = merged; else { old.orders.splice(i, 1); place.orders.push(merged); byId.set(order.id, place); }
@@ -2047,14 +2254,15 @@ async function loadInto(shop, rows) {
   const todo = shop.places.filter(p => p.lat == null);
   for (let i = 0; i < todo.length; i++) {
     if (runs[shop.id] !== run) return;
-    const p = todo[i]; shop.loading = `Шукаю міста на мапі ${i+1}/${todo.length}…`; renderShops();
-    const c = await geocode(p); if (c) { p.lat = c[0]; p.lng = c[1]; }
+    const p = todo[i]; shop.loading = `${p.zip ? 'Уточнюю піни за індексом' : 'Шукаю міста на мапі'} ${i+1}/${todo.length}…`; renderShops();
+    const c = await geocode(p); if (c) { p.lat = c[0]; p.lng = c[1]; } else if (p.regeo) { [p.lat, p.lng] = p.regeo; }
+    delete p.regeo;
     if (i % 3 === 0 || i === todo.length-1) redraw(false);
   }
-  if (runs[shop.id] !== run) return;
+  if (runs[shop.id] !== run) { shop.places.forEach(p => { if (p.lat == null && p.regeo) { [p.lat, p.lng] = p.regeo; delete p.regeo; } }); return; }
   const lost = shop.places.filter(p => p.lat == null); const unplaced = lost.reduce((s,p) => s + p.orders.length, 0);
   shop.places = shop.places.filter(p => p.lat != null);
-  computeRepeat(shop); shop.loading = false; await saveData(shop);
+  applyReviews(shop); computeRepeat(shop); shop.loading = false; await saveData(shop);
   const parts = [`+${added} нових`]; if (updated) parts.push(`${updated} оновлено`); if (dup) parts.push(`${dup} дублів пропущено`); if (unplaced) parts.push(`${unplaced} не знайдено на мапі`);
   toast(`«${shop.name}»: ${parts.join(', ')}.`, 6000);
   renderShops(); refresh(true);
@@ -2066,6 +2274,7 @@ async function loadFile(f) {
   if (data && !Array.isArray(data) && data.app === BACKUP_APP) return restoreBackup(data);
   if (!Array.isArray(data) || !data.length) return toast('У файлі немає замовлень.', 4000);
   if (isStatement(data)) return loadLedger(activeShop(), data);
+  if (isReviews(data)) return loadReviews(activeShop(), data);
   return loadInto(activeShop(), data);
 }
 // several files at once (e.g. Sold Orders + Sold Order Items + statements): one after another,
@@ -2077,7 +2286,7 @@ function loadFiles(list) {
   files.forEach((f, i) => { fileQueue = fileQueue.then(() => { if (files.length > 1) toast(`Файл ${i+1} з ${files.length}: ${f.name}`, 2500); return loadFile(f); }).catch(e => toast('Помилка у файлі ' + f.name + ': ' + e.message, 5000)); });
 }
 $('file').onchange = e => { loadFiles(e.target.files); e.target.value=''; };
-document.body.ondragover = e => { e.preventDefault(); if (!viewOnly) document.body.classList.add('drop'); };
+document.body.ondragover = e => { e.preventDefault(); if (!viewOnly && [...(e.dataTransfer?.types || [])].includes('Files')) document.body.classList.add('drop'); };
 document.body.ondragleave = e => { if (!e.relatedTarget) document.body.classList.remove('drop'); };
 document.body.ondrop = e => { e.preventDefault(); document.body.classList.remove('drop'); loadFiles(e.dataTransfer.files); };
 $('clear').onclick = () => { cache = {}; kv.set('geo', cache); toast('Кеш геокодингу очищено.', 2000); };
@@ -2111,6 +2320,15 @@ async function installApp() {
     : 'Chrome/Edge: значок встановлення праворуч в адресному рядку, або меню ⋮ → «Трансляція, збереження й поширення» → «Встановити сторінку як застосунок».', 9000);
 }
 
+// data imported before entity decoding existed: fix it in place; returns true when something changed
+function cleanEntities(s) {
+  let ch = false; const fx = (o, k) => { const v = unent(o[k]); if (v !== o[k]) { o[k] = v; ch = true; } };
+  s.places.forEach(p => { const c0 = p.city; fx(p, 'city'); if (p.city !== c0) p.key = placeKey(p); p.orders.forEach(o => { ['buyer','couponInfo','coupon'].forEach(k => fx(o, k)); (o.items || []).forEach(it => { if (typeof it === 'object') { fx(it, 't'); fx(it, 'v'); } }); if (o.review) { fx(o.review, 'm'); fx(o.review, 'by'); } }); });
+  Object.values(s.reviews || {}).forEach(r => { fx(r, 'm'); fx(r, 'by'); });
+  (s.ledger || []).forEach(r => { fx(r, 'title'); fx(r, 'info'); });
+  return ch;
+}
+
 // ================= boot =================
 (async function boot() {
   const hash = location.hash.startsWith('#v=') ? location.hash.slice(3) : '';
@@ -2135,7 +2353,7 @@ async function installApp() {
       meta = [{ id:uid(), name:b.name || 'Мій Etsy-магазин', logo:b.logo || '', color:COLORS[0], visible:true }];
     }
     shops = meta;
-    for (const s of shops) { s.places = (await kv.get('data:'+s.id)) || []; s.ledger = (await kv.get('ledger:'+s.id)) || []; s.visible = s.visible !== false; s.loading = false; s.places.forEach(p => p.key ||= placeKey(p)); computeRepeat(s); }
+    for (const s of shops) { s.places = (await kv.get('data:'+s.id)) || []; s.ledger = (await kv.get('ledger:'+s.id)) || []; s.reviews = (await kv.get('reviews:'+s.id)) || {}; if (cleanEntities(s)) { saveData(s); kv.set('reviews:'+s.id, s.reviews); } s.visible = s.visible !== false; s.loading = false; s.places.forEach(p => p.key ||= placeKey(p)); computeRepeat(s); }
     cache = (await kv.get('geo')) || {};
     activeId = shops[0].id; saveShops();
   }
