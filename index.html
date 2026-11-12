@@ -39,7 +39,18 @@
   #left { position:absolute; top:14px; left:14px; z-index:1000; width:min(372px, calc(100vw - 28px)); max-height:calc(100% - 150px); display:flex; flex-direction:column; gap:10px; pointer-events:none; }
   #left > * { pointer-events:auto; }
   #shopsCard { padding:10px 8px 8px; flex:none; }
-  .sh-head { display:flex; align-items:center; justify-content:space-between; padding:2px 8px 6px; gap:8px; }
+  .sh-head { display:flex; align-items:center; padding:2px 4px 6px 8px; gap:8px; }
+  #collapseShops svg { transition:transform .2s; }
+  #shopsCard.collapsed #collapseShops svg { transform:rotate(180deg); }
+  #shopsCard.collapsed #shopList, #shopsCard.collapsed #addShop { display:none; }
+  #shopsCard.collapsed .sh-head { padding-bottom:2px; }
+  #miniShops { display:none; align-items:center; }
+  #shopsCard.collapsed #miniShops { display:flex; }
+  #miniShops .av { width:24px; height:24px; border-radius:8px; font-size:12px; box-shadow:none; border:2px solid var(--solid); margin-left:-7px; }
+  #miniShops .av:first-child { margin-left:0; }
+  #miniShops .av.off { opacity:.35; }
+  /* blur shop names and logos, e.g. for screenshots */
+  body.blurnames .shop .n, body.blurnames .shop .av, body.blurnames #miniShops .av, body.blurnames .m-shop { filter:blur(6px); user-select:none; }
   .sh-head b { font-size:15px; letter-spacing:-.01em; }
   #viewerLink { display:none; font-size:13px; font-weight:600; color:var(--accent); text-decoration:none; white-space:nowrap; }
   #shopList { max-height:236px; overflow:auto; display:flex; flex-direction:column; gap:2px; }
@@ -55,7 +66,9 @@
   .shop .acts .ib { width:30px; height:30px; }
   .shop .acts .ib:hover { color:var(--c); }
 
-  #kpis { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.75fr) minmax(0,.8fr) minmax(0,1.45fr); gap:8px; flex:none; }
+  #kpis { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; flex:none; }
+  .neg { color:var(--danger) !important; }
+  .pos { color:var(--good) !important; }
   .kpi { padding:10px 6px; text-align:center; border-radius:14px; min-width:0; cursor:pointer; transition:transform .15s, border-color .15s; }
   .kpi:hover { transform:translateY(-1px); border-color:var(--accent); }
   .kpi.on { border-color:var(--accent); box-shadow:0 0 0 1.5px var(--accent), var(--shadow); }
@@ -117,7 +130,11 @@
   /* ---------- right sheet (place orders / statistics) ---------- */
   #sheet { position:absolute; z-index:1100; top:66px; right:14px; width:min(430px, calc(100vw - 28px)); max-height:calc(100% - 150px); display:flex; flex-direction:column; overflow:hidden; opacity:0; transform:translateX(24px) scale(.98); pointer-events:none; transition:opacity .22s, transform .22s; border-radius:22px; }
   #sheet.open { opacity:1; transform:none; pointer-events:auto; }
-  .m-head { padding:18px 18px 14px; display:flex; gap:12px; align-items:flex-start; background:linear-gradient(160deg,color-mix(in srgb, var(--c) 18%, transparent),transparent 70%); flex:none; }
+  /* one soft tint across the whole top of the sheet, fading out smoothly below the header and tabs */
+  #sheet::before { content:""; position:absolute; left:0; right:0; top:0; height:240px; pointer-events:none; z-index:0;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--c) 20%, transparent) 0%, color-mix(in srgb, var(--c) 8%, transparent) 55%, transparent 100%); }
+  #sheet > * { position:relative; z-index:1; }
+  .m-head { padding:18px 18px 14px; display:flex; gap:12px; align-items:flex-start; flex:none; }
   .m-pin { width:42px; height:42px; border-radius:14px; background:var(--c); color:#fff; display:grid; place-items:center; font-size:20px; flex:none; box-shadow:0 4px 12px color-mix(in srgb, var(--c) 45%, transparent); }
   .m-title { font-size:20px; font-weight:780; letter-spacing:-.02em; line-height:1.2; }
   .m-sub { color:var(--muted); font-size:13px; }
@@ -158,10 +175,12 @@
   .grp i { flex:1; border-radius:2px 2px 0 0; min-height:1px; }
   .lgd { display:flex; gap:12px; font-size:11.5px; color:var(--muted); margin-top:6px; flex-wrap:wrap; }
   .lgd b { display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:4px; vertical-align:-1px; }
-  .tabs { display:flex; gap:3px; margin:18px 0 6px; background:var(--hover); padding:3px; border-radius:12px; overflow-x:auto; scrollbar-width:none; }
-  .tabs button { flex:1 0 auto; border:0; background:transparent; padding:6px 9px; border-radius:9px; cursor:pointer; font-size:12.5px; font-weight:600; color:var(--muted); white-space:nowrap; }
+  .tabs { display:flex; flex-wrap:wrap; gap:3px; margin:18px 0 6px; background:var(--hover); padding:3px; border-radius:12px; }
+  .tabs button { flex:1 0 auto; border:0; background:transparent; padding:6px 7px; border-radius:9px; cursor:pointer; font-size:12px; font-weight:600; color:var(--muted); white-space:nowrap; }
+  .tabs button small { font-size:10.5px; }
   .tabs button.on { background:var(--solid); color:var(--fg); box-shadow:0 1px 3px rgba(0,0,0,.12); }
-  .rk { position:relative; display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; cursor:pointer; overflow:hidden; }
+  .rk { position:relative; display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; cursor:pointer; overflow:hidden; margin-bottom:6px; }
+  .rk:last-child { margin-bottom:0; }
   .rk:hover { background:var(--hover); }
   .rk.on { outline:2px solid var(--accent); }
   .rk .bar { position:absolute; left:0; top:0; bottom:0; background:var(--accent-soft); border-radius:10px; z-index:-1; }
@@ -235,7 +254,7 @@
 
 <div id="left">
   <div id="shopsCard" class="glass">
-    <div class="sh-head"><b id="shopsTitle">Мої магазини</b><button class="btn primary" id="addShop" style="padding:5px 12px">＋ Додати</button><a id="viewerLink" href="./">Створити свою мапу →</a></div>
+    <div class="sh-head"><b id="shopsTitle">Мої магазини</b><span id="miniShops"></span><span style="flex:1"></span><button class="btn primary" id="addShop" style="padding:5px 12px">＋ Додати</button><a id="viewerLink" href="./">Створити свою мапу →</a><button class="ib" id="blurShops"></button><button class="ib" id="collapseShops"></button></div>
     <div id="shopList"></div>
   </div>
 
@@ -244,12 +263,14 @@
     <div class="glass kpi"><b id="kCities">0</b><span>Міст</span><i id="dCities"></i></div>
     <div class="glass kpi"><b id="kCountries">0</b><span>Країн</span><i id="dCountries"></i></div>
     <div class="glass kpi"><b id="kRev">—</b><span>Дохід</span><i id="dRev"></i></div>
+    <div class="glass kpi own-only"><b id="kCosts">—</b><span>Витрати</span><i id="dCosts"></i></div>
+    <div class="glass kpi own-only"><b id="kProfit">—</b><span>Чистий прибуток</span><i id="dProfit"></i></div>
   </div>
 
   <div id="search" class="glass">
     <span aria-hidden="true">🔍</span>
     <input id="q" type="search" placeholder="Пошук міста, країни чи покупця" autocomplete="off">
-    <button class="ib" id="toggleFilters" title="Фільтри">⚙️</button>
+    <button class="ib" id="toggleFilters" title="Фільтри"></button>
   </div>
 
   <div id="filtersCard" class="glass">
@@ -323,7 +344,7 @@
     <input type="text" id="dlgOrigin" placeholder="Наприклад, Kyiv, Ukraine">
     <div class="hint" id="dlgOriginHint">Необов'язково.</div>
     <div class="danger-row" id="dlgDanger">
-      <button class="link danger" id="dlgClear">Очистити замовлення</button>
+      <button class="link danger" id="dlgClear">Очистити дані</button>
       <button class="link danger" id="dlgDelete">Видалити магазин</button>
     </div>
     <div class="row" style="justify-content:flex-end"><button class="btn" id="dlgCancel">Скасувати</button><button class="btn primary" id="dlgSave">Зберегти</button></div>
@@ -365,7 +386,7 @@ const kv = (() => {
 // ================= shops =================
 let shops = [], activeId = null;
 const uid = () => 's' + Math.random().toString(36).slice(2,9);
-const shopMeta = ({places, loading, ...m}) => m;
+const shopMeta = ({places, loading, ledger, ...m}) => m;
 function saveShops() { kv.set('shops', shops.map(shopMeta)); }
 async function saveData(s) { if (!await kv.set('data:'+s.id, s.places)) toast('Не вдалося зберегти дані в браузері — після перезавантаження їх треба буде додати знову.', 6000); }
 const shopById = id => shops.find(s => s.id===id);
@@ -396,14 +417,37 @@ const ICON = {
   download: svg('<path d="M12 4v11M7 10l5 5 5-5M4 20h16"/>'),
   sun:    svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
   moon:   svg('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
+  filter: svg('<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>'),
+  chevron: svg('<path d="M6 15l6-6 6 6"/>'),
+  eye:    svg('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+  eyeOff: svg('<path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17.8 17.8 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.9 0 3.6-.6 5-1.4"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'),
 };
+let blurNames = ls.get('etsyBlurNames') === '1';
+function syncBlur() {
+  document.body.classList.toggle('blurnames', blurNames);
+  $('blurShops').innerHTML = blurNames ? ICON.eyeOff : ICON.eye;
+  $('blurShops').classList.toggle('on', blurNames);
+  $('blurShops').title = blurNames ? 'Показати назви й логотипи магазинів' : 'Розмити назви й логотипи магазинів (для скріншотів)';
+}
+$('blurShops').onclick = () => { blurNames = !blurNames; ls.set('etsyBlurNames', blurNames ? '1' : '0'); syncBlur(); if (routesOn) redraw(false); };
+syncBlur();
+// the shops card can be folded to a single line with small logos (remembered per browser)
+function syncShopsCollapse() {
+  const c = ls.get('etsyShopsCollapsed') === '1';
+  $('shopsCard').classList.toggle('collapsed', c);
+  $('collapseShops').innerHTML = ICON.chevron;
+  $('collapseShops').title = c ? 'Показати магазини' : 'Сховати магазини';
+}
+$('collapseShops').onclick = () => { ls.set('etsyShopsCollapsed', ls.get('etsyShopsCollapsed') === '1' ? '0' : '1'); syncShopsCollapse(); };
+syncShopsCollapse();
 
 function renderShops() {
+  $('miniShops').innerHTML = shops.map(s => avatarHTML(s).replace('class="av"', `class="av${s.visible ? '' : ' off'}" title="${esc(s.name)}"`)).join('');
   const box = $('shopList'); box.innerHTML = '';
   shops.forEach(s => {
     const el = document.createElement('div'); el.className = 'shop'+(s.id===activeId && !viewOnly ?' active':''); el.style.setProperty('--c', s.color);
     const n = nOrders(s);
-    el.innerHTML = `${avatarHTML(s)}<div class="t"><div class="n">${esc(s.name)}</div><div class="s">${s.loading ? '⏳ '+esc(s.loading) : n ? `<span class="dotc"></span>${n} замовлень · ${s.places.length} міст` : 'Немає даних — завантажте CSV'}</div></div>
+    el.innerHTML = `${avatarHTML(s)}<div class="t"><div class="n">${esc(s.name)}</div><div class="s">${s.loading ? '⏳ '+esc(s.loading) : n ? `<span class="dotc"></span>${n} замовлень · ${s.places.length} міст${s.ledger?.length ? ' · виписка ✓' : ''}` : 'Немає даних — завантажте CSV'}</div></div>
       <div class="acts"><button class="ib" data-a="up" title="Завантажити замовлення">${ICON.up}</button><button class="ib" data-a="edit" title="Редагувати">${ICON.edit}</button><button class="ib${s.visible?'':' off'}" data-a="eye" title="${s.visible?'Сховати піни магазину':'Показати піни магазину'}">${s.visible?ICON.pin:ICON.pinOff}</button></div>`;
     el.onclick = e => {
       const a = e.target.closest('button')?.dataset.a;
@@ -472,8 +516,8 @@ function openDlg(shop) {
   $('dlgOriginHint').textContent = shop?.origin ? 'Знайдено на мапі ✓' : 'Необов\'язково. Потрібно для маршрутів і відстаней.';
   $('dlgDanger').style.display = shop ? '' : 'none';
   $('dlgDelete').style.display = shop && shops.length>1 ? '' : 'none';
-  $('dlgClear').style.display = shop && shop.places.length ? '' : 'none';
-  for (const [id, txt] of [['dlgDelete','Видалити магазин'],['dlgClear','Очистити замовлення']]) { $(id).textContent = txt; delete $(id).dataset.armed; }
+  $('dlgClear').style.display = shop && (shop.places.length || shop.ledger?.length) ? '' : 'none';
+  for (const [id, txt] of [['dlgDelete','Видалити магазин'],['dlgClear','Очистити дані']]) { $(id).textContent = txt; delete $(id).dataset.armed; }
   dlgRender(); $('dlg').classList.add('open'); $('dlgName').focus();
 }
 $('addShop').onclick = () => openDlg(null);
@@ -499,11 +543,11 @@ $('dlgSave').onclick = async () => {
   if (!dlgShop) toast(`Магазин «${name}» додано. Натисніть ⬆ біля нього, щоб завантажити замовлення.`, 5000);
 };
 confirmBtn($('dlgDelete'), 'Точно видалити магазин?', () => {
-  kv.del('data:'+dlgShop.id); shops = shops.filter(s => s !== dlgShop); activeId = shops[0].id;
+  kv.del('data:'+dlgShop.id); kv.del('ledger:'+dlgShop.id); shops = shops.filter(s => s !== dlgShop); activeId = shops[0].id;
   saveShops(); closeSheet(); $('dlg').classList.remove('open'); renderShops(); syncUploadLabel(); refresh(true);
 });
-confirmBtn($('dlgClear'), 'Точно очистити всі замовлення?', () => {
-  dlgShop.places = []; kv.del('data:'+dlgShop.id); closeSheet(); $('dlg').classList.remove('open'); renderShops(); refresh(true);
+confirmBtn($('dlgClear'), 'Точно очистити замовлення й виписки?', () => {
+  dlgShop.places = []; dlgShop.ledger = []; kv.del('data:'+dlgShop.id); kv.del('ledger:'+dlgShop.id); closeSheet(); $('dlg').classList.remove('open'); renderShops(); refresh(true);
   toast(`Замовлення магазину «${dlgShop.name}» очищено.`, 3000);
 });
 $('dlgFile').onchange = e => {
@@ -632,6 +676,83 @@ function sumMoney(orders, compact=false, field='total') {
   const a = moneyAgg(orders, field), f = compact ? fmtCompact : fmtMoney;
   if (a.by) { const parts = Object.entries(a.by).sort((x,y) => y[1].v - x[1].v).map(([c,o]) => f(o.v, c)); return parts.length ? parts.join(' + ') : '—'; }
   return a.n ? f(a.v, a.cur) + (a.miss ? '*' : '') : '—';
+}
+
+// ================= Etsy monthly statement (fees, ads, labels, refunds → expenses and net profit) =================
+// Shop Manager → Finances → Monthly statements → Download CSV: Date, Type, Title, Info, Currency, Amount, Fees & Taxes, Net
+const COST_CATS = { transaction:'Комісія за продаж', processing:'Обробка платежів', listing:'Розміщення лістингів', ads:'Реклама', labels:'Етикетки доставки', refund:'Повернення покупцям', tax:'Податки', other:'Інші збори Etsy' };
+const isStatement = rows => { const k = Object.keys(rows[0] || {}); return k.includes('type') && k.includes('net') && !k.includes('order id') && !k.includes('sale date'); };
+const numSigned = v => { const s = String(v ?? '').trim(); const n = num(s); return n == null ? null : (/^\(.*\)$/.test(s) && n > 0 ? -n : n); };
+function ledgerCat(type, title) {
+  const t = (type||'').toLowerCase(), s = (title||'').toLowerCase();
+  if (/deposit|payment|transfer|payout/.test(t)) return null; // money moved to the bank or bills paid — not income or costs
+  if (t === 'sale') return 'sale';
+  if (/refund/.test(t) || /refund/.test(s)) return 'refund';
+  if (/transaction fee/.test(s)) return 'transaction';
+  if (/processing fee/.test(s)) return 'processing';
+  if (/listing fee|renew/.test(s)) return 'listing';
+  if (/market/.test(t) || /\bads?\b|advertis|offsite/.test(s)) return 'ads';
+  if (/shipping/.test(t) || /label/.test(s)) return 'labels';
+  if (/tax|vat/.test(t)) return 'tax';
+  return 'other';
+}
+function parseLedger(rows) {
+  return rows.map(r => {
+    const type = pick(r, ['type']), title = pick(r, ['title','description']), info = pick(r, ['info']);
+    const t = Date.parse(pick(r, ['date']));
+    let net = numSigned(pick(r, ['net']));
+    if (net == null) { const a = numSigned(pick(r, ['amount'])), f = numSigned(pick(r, ['fees & taxes','fees and taxes'])); if (a != null || f != null) net = (a||0) + (f||0); }
+    return { date: isNaN(t) ? '' : new Date(t).toISOString(), type, title, info, net, currency: pick(r, ['currency']) || 'USD',
+      orderId: (info.match(/order\s*#?\s*(\d+)/i) || title.match(/order\s*#?\s*(\d+)/i) || [])[1] || '', cat: ledgerCat(type, title) };
+  }).filter(x => x.date && x.net != null && x.cat);
+}
+// statement rows of visible shops inside the period; with other filters only fees tied to visible orders count
+function ledgerEntries(b = rangeBounds()) {
+  const other = filt.q || filt.countries.size || filt.repeat || filt.item;
+  const ids = other ? new Set(visibleEntries(b).flatMap(e => e.orders.map(o => o.id))) : null;
+  return shops.filter(s => s.visible).flatMap(s => (s.ledger || []).filter(r => {
+    const t = Date.parse(r.date); if (b && !(t >= b[0] && t < b[1])) return false;
+    return !ids || (r.orderId && ids.has(r.orderId));
+  }));
+}
+function financeOf(b) {
+  const rows = ledgerEntries(b);
+  return { rows, cost: moneyAgg(rows.filter(r => r.cat !== 'sale').map(r => ({ currency:r.currency, v:-r.net })), 'v'), profit: moneyAgg(rows, 'net') };
+}
+const fmtAgg = a => a.n ? fmtMoney(a.v, a.cur) + (a.miss ? '*' : '') : '—';
+const hasLedger = () => shops.some(s => s.visible && s.ledger?.length);
+const STATEMENT_HINT = 'Завантажте виписку Etsy: Shop Manager → Finances → Monthly statements → Download CSV';
+function updateFinanceKPIs(cb) {
+  const put = (id, a) => { const full = fmtAgg(a); $(id).textContent = full.length > 11 && a.n ? fmtCompact(a.v, a.cur) : full; $(id).title = full; };
+  if (!hasLedger()) { ['kCosts','kProfit'].forEach(id => { $(id).textContent = '—'; $(id).title = STATEMENT_HINT; $(id).classList.remove('neg', 'pos'); }); showDelta('dCosts', null); showDelta('dProfit', null); return; }
+  const f = financeOf(rangeBounds());
+  put('kCosts', f.cost); put('kProfit', f.profit);
+  const spent = !!f.cost.n && f.cost.v > 0;
+  $('kCosts').classList.toggle('neg', spent);
+  if (spent) { $('kCosts').textContent = '-' + $('kCosts').textContent; $('kCosts').title = '-' + $('kCosts').title; }
+  const gain = !!f.profit.n && f.profit.v > 0;
+  $('kProfit').classList.toggle('neg', !!f.profit.n && f.profit.v < 0); $('kProfit').classList.toggle('pos', gain);
+  if (gain) { $('kProfit').textContent = '+' + $('kProfit').textContent; $('kProfit').title = '+' + $('kProfit').title; }
+  if (cb) {
+    const p = financeOf(cb), lbl = 'Порівняно з ' + boundsLabel(cb);
+    const inv = d => d && { ...d, c: d.c === 'up' ? 'down' : d.c === 'down' ? 'up' : d.c }; // more costs = bad
+    showDelta('dCosts', f.cost.cur === p.cost.cur || !p.cost.n ? inv(pctDelta(f.cost.v, p.cost.n ? p.cost.v : 0)) : null, `${lbl}: ${fmtAgg(p.cost)}`);
+    showDelta('dProfit', f.profit.cur === p.profit.cur || !p.profit.n ? pctDelta(f.profit.v, p.profit.n ? p.profit.v : 0) : null, `${lbl}: ${fmtAgg(p.profit)}`);
+  } else { showDelta('dCosts', null); showDelta('dProfit', null); }
+}
+async function loadLedger(shop, rows) {
+  const items = parseLedger(rows);
+  if (!items.length) return toast('У виписці не знайдено рядків із сумами. Це точно CSV з Finances → Monthly statements?', 6000);
+  // identical rows can be legitimate (e.g. two $0.20 listing fees), so dedupe by count, not by presence
+  const key = r => [r.date, r.type, r.title, r.info, r.net].join('|'), have = new Map();
+  shop.ledger ||= []; shop.ledger.forEach(r => have.set(key(r), (have.get(key(r))||0) + 1));
+  const seen = new Map(); let added = 0, dup = 0;
+  for (const r of items) { const k = key(r), n = (seen.get(k)||0) + 1; seen.set(k, n); if (n <= (have.get(k)||0)) dup++; else { shop.ledger.push(r); added++; } }
+  shop.visible = true;
+  if (!await kv.set('ledger:'+shop.id, shop.ledger)) toast('Не вдалося зберегти виписку в браузері.', 5000);
+  const dates = items.map(r => Date.parse(r.date)).sort((a,b) => a-b);
+  renderShops(); refresh(false);
+  toast(`«${shop.name}»: виписка ${fmtDay(new Date(dates[0]))} — ${fmtDay(new Date(dates[dates.length-1]))}, +${added} рядків${dup ? `, ${dup} дублів пропущено` : ''}.`, 6000);
 }
 
 // ================= geocoding (Nominatim, one request per second, cached) =================
@@ -779,7 +900,7 @@ let heatLayer = null;
 let display = ['pins','groups','heat','regions'].includes(ls.get('etsyDisplay')) ? ls.get('etsyDisplay') : 'groups';
 let routesOn = ls.get('etsyRoutes') === '1';
 let selected = null, sheet = null; // sheet: 'place' | 'stats' | 'list'
-const KPI_TABS = ['orders','cities','countries','tx']; let listTab = 'orders';
+const KPI_TABS = ['orders','cities','countries','tx','costs','costs']; let listTab = 'orders';
 
 function pinIcon(count, sel, color, shiftX) {
   const w = Math.round(Math.min(48, 28 + Math.sqrt(count)*4)), h = Math.round(w*1.5);
@@ -856,7 +977,7 @@ function drawRegions(vis) {
 function pctDelta(cur, prev) {
   if (!prev && !cur) return { t:'', c:'flat' };
   if (!prev) return { t:'нове', c:'up' };
-  const p = Math.round((cur - prev) / prev * 100);
+  const p = Math.round((cur - prev) / Math.abs(prev) * 100);
   return { t: (p > 0 ? '▲ ' : p < 0 ? '▼ ' : '') + Math.abs(p) + '%', c: p > 0 ? 'up' : p < 0 ? 'down' : 'flat' };
 }
 function absDelta(cur, prev) { const d = cur - prev; return { t: d > 0 ? '▲ ' + d : d < 0 ? '▼ ' + (-d) : '±0', c: d > 0 ? 'up' : d < 0 ? 'down' : 'flat' }; }
@@ -901,7 +1022,7 @@ function redraw(fit=false) {
       if (!s.visible || !s.origin) continue;
       const o = [s.origin.lat, s.origin.lng], mine = vis.filter(e => e.shop === s);
       mine.forEach(e => L.polyline(arc(o, [e.place.lat, e.place.lng]), { color:s.color, weight: Math.min(4, 1.2 + Math.log2(e.orders.length)*.7), opacity:.55, interactive:false }).addTo(routeLayer));
-      L.marker(o, { icon:originIcon(s.color), zIndexOffset:2000 }).bindTooltip(`🏠 ${esc(s.name)}: ${esc(s.origin.q)}`, { direction:'top', className:'origin-tip', offset:[0,-14] }).addTo(routeLayer);
+      L.marker(o, { icon:originIcon(s.color), zIndexOffset:2000 }).bindTooltip(blurNames ? '🏠 Місто відправки' : `🏠 ${esc(s.name)}: ${esc(s.origin.q)}`, { direction:'top', className:'origin-tip', offset:[0,-14] }).addTo(routeLayer);
     }
   }
   // KPIs (+ change against the comparison period)
@@ -917,6 +1038,7 @@ function redraw(fit=false) {
     showDelta('dCountries', absDelta(countries, new Set(pv.map(e => e.place.country)).size), lbl);
     showDelta('dRev', ra.cur === rp.cur || !rp.n ? pctDelta(ra.v, rp.n ? rp.v : 0) : null, `${lbl}: ${sumMoney(pAll)}`);
   } else ['dOrders','dCities','dCountries','dRev'].forEach(id => showDelta(id, null));
+  if (!viewOnly) updateFinanceKPIs(cb);
   if (fit && vis.length) {
     const pts = vis.map(e => [e.place.lat, e.place.lng]);
     if (routesOn) shops.forEach(s => { if (s.visible && s.origin) pts.push([s.origin.lat, s.origin.lng]); });
@@ -945,6 +1067,7 @@ function syncTopButtons() {
   $('privacyBtn').innerHTML = privacy ? ICON.lock : ICON.unlock; $('privacyBtn').classList.toggle('on', privacy);
   $('privacyBtn').title = privacy ? 'Приватний режим увімкнено: імена покупців сховані' : 'Приватний режим: сховати імена покупців';
   $('exportBtn').innerHTML = ICON.download;
+  $('toggleFilters').innerHTML = ICON.filter;
   $('themeBtn').innerHTML = theme === 'dark' ? ICON.sun : ICON.moon;
   $('themeBtn').title = theme === 'dark' ? 'Світла тема' : 'Темна тема';
   document.querySelectorAll('#kpis .kpi').forEach((el, i) => el.classList.toggle('on', sheet === 'list' && listTab === KPI_TABS[i]));
@@ -1035,7 +1158,8 @@ function renderList() {
   const cities = [...cityMap.values()].sort((a,b) => b.orders.length - a.orders.length);
   const ctryMap = new Map(); vis.forEach(e => { const k = e.place.country||'—'; if (!ctryMap.has(k)) ctryMap.set(k, { c:k, orders:[], cities:new Set() }); ctryMap.get(k).orders.push(...e.orders); ctryMap.get(k).cities.add(placeKey(e.place)); });
   const countries = [...ctryMap.values()].sort((a,b) => b.orders.length - a.orders.length);
-  const TABS = [['orders','Замовлення',orders.length],['cities','Міста',cities.length],['countries','Країни',countries.length],['tx','Транзакції',tx.length]];
+  const ledgerRows = viewOnly ? [] : ledgerEntries().sort((a,b) => Date.parse(b.date) - Date.parse(a.date));
+  const TABS = [['orders','Замовлення',orders.length],['cities','Міста',cities.length],['countries','Країни',countries.length],['tx','Транзакції',tx.length], ...(viewOnly ? [] : [['costs','Витрати',ledgerRows.length]])];
   let body = '', pick = () => {}, total = 0, note = '';
   if (listTab === 'orders') {
     total = orders.length; body = orders.slice(0, LIST_MAX).map((x, i) => orderRow(x.o, x.e.place, i)).join('');
@@ -1049,6 +1173,21 @@ function renderList() {
     body = rankHTML(countries.map(x => ({ name:esc(x.c), sub:`${x.cities.size} міст`, val:x.orders.length, rev:sumMoney(x.orders), share:x.orders.length/mx, on:filt.countries.has(x.c) })));
     pick = i => { filt.countries = new Set([countries[i].c]); refresh(true); };
     note = 'Натисніть на країну, щоб показати на мапі лише її.';
+  } else if (listTab === 'costs') {
+    total = ledgerRows.length;
+    if (!hasLedger()) {
+      body = `<div class="empty" style="text-align:left;line-height:1.7">Комісії й витрати Etsy є у щомісячній виписці:<br>1. Shop Manager → <b>Finances</b> → <b>Monthly statements</b><br>2. Виберіть місяць → <b>Download CSV</b><br>3. Тут натисніть ⬆ біля магазину й виберіть цей файл.<br><br>Можна завантажити кілька місяців — дублі не з'являться.</div>`;
+    } else {
+      const byCat = new Map(); ledgerRows.filter(r => r.cat !== 'sale').forEach(r => { if (!byCat.has(r.cat)) byCat.set(r.cat, []); byCat.get(r.cat).push({ currency:r.currency, v:-r.net }); });
+      const cats = [...byCat].map(([c, list]) => ({ c, a:moneyAgg(list, 'v') })).filter(x => Math.abs(x.a.v) >= .005).sort((a,b) => b.a.v - a.a.v);
+      const mx = Math.max(.01, ...cats.map(x => Math.abs(x.a.v))), f = financeOf(rangeBounds());
+      body = `<div class="st-grid" style="padding:0 6px 10px"><div class="m-stat"><b class="${f.cost.n && f.cost.v > 0 ? 'neg' : ''}">${f.cost.n && f.cost.v > 0 ? '-' : ''}${esc(fmtAgg(f.cost))}</b><span>Витрати</span></div><div class="m-stat"><b class="${f.profit.n && f.profit.v < 0 ? 'neg' : f.profit.n && f.profit.v > 0 ? 'pos' : ''}">${f.profit.n && f.profit.v > 0 ? '+' : ''}${esc(fmtAgg(f.profit))}</b><span>Чистий прибуток</span></div></div>`
+        + rankHTML(cats.map(x => ({ name:esc(COST_CATS[x.c] || x.c), val:esc(fmtMoney(x.a.v, x.a.cur)), share:Math.abs(x.a.v)/mx })))
+        + `<div class="m-h">Рядки виписки</div>`
+        + ledgerRows.slice(0, LIST_MAX).map(r => `<div class="order"><div class="ic">${r.cat === 'sale' ? '💰' : '🧾'}</div><div class="mid"><div class="tt">${esc(r.title || r.type)}</div><div class="mm">${esc([fmtDate(r.date), r.type, r.info].filter(Boolean).join(' · '))}</div></div><div class="pr${r.net < 0 ? ' neg' : r.net > 0 ? ' pos' : ''}">${r.net > 0 ? '+' : ''}${priceHTML(r.net, r.currency)}</div></div>`).join('');
+      note = 'З виписки Etsy. Прибуток = продажі мінус комісії, реклама, етикетки й повернення — без вашої собівартості.'
+        + (filt.q || filt.countries.size || filt.repeat || filt.item ? ' З активними фільтрами враховано лише збори, пов\'язані з видимими замовленнями.' : '');
+    }
   } else {
     total = tx.length;
     body = tx.slice(0, LIST_MAX).map(({ it, o, e }, i) => {
@@ -1233,12 +1372,13 @@ async function exportPNG() {
   const rr = (X, Y, w, h, r) => { x.beginPath(); x.roundRect ? x.roundRect(X, Y, w, h, r) : x.rect(X, Y, w, h); };
   for (const s of vis.slice(0, 4)) {
     const y = H + 18;
-    if (s.logo) { const im = await loadImg(s.logo); if (im) { x.save(); rr(lx, y, 40, 40, 11); x.clip(); x.drawImage(im, lx, y, 40, 40); x.restore(); } }
+    if (blurNames) { x.fillStyle = s.color; rr(lx, y, 40, 40, 11); x.fill(); }
+    else if (s.logo) { const im = await loadImg(s.logo); if (im) { x.save(); rr(lx, y, 40, 40, 11); x.clip(); x.drawImage(im, lx, y, 40, 40); x.restore(); } }
     else { x.fillStyle = s.color; rr(lx, y, 40, 40, 11); x.fill(); x.fillStyle = '#fff'; x.font = '800 20px system-ui,sans-serif'; x.textAlign = 'center'; x.fillText((s.name.trim()[0]||'M').toUpperCase(), lx+20, y+27); }
     lx += 46;
   }
   x.textAlign = 'left'; x.fillStyle = P.fg; x.font = '700 17px system-ui,-apple-system,sans-serif';
-  x.fillText(vis.map(s => s.name).join(' · ') || 'Карта замовлень', lx + 6, H + 34);
+  x.fillText(blurNames ? 'Карта замовлень Etsy' : (vis.map(s => s.name).join(' · ') || 'Карта замовлень'), lx + 6, H + 34);
   x.fillStyle = P.mut; x.font = '13px system-ui,-apple-system,sans-serif';
   x.fillText(`${$('kOrders').textContent} замовлень · ${$('kCities').textContent} міст · ${$('kCountries').textContent} країн · ${$('kRev').title || ''} · ${rangeLabel()}${filt.item ? ' · ' + filt.item.t : ''}`, lx + 6, H + 56);
   try {
@@ -1249,7 +1389,7 @@ async function exportPNG() {
 // ================= backup / restore =================
 const BACKUP_APP = 'etsy-orders-geo';
 function exportBackup() {
-  const data = { app:BACKUP_APP, version:1, exported:new Date().toISOString(), shops: shops.map(s => ({ ...shopMeta(s), places:s.places })), geo:cache };
+  const data = { app:BACKUP_APP, version:1, exported:new Date().toISOString(), shops: shops.map(s => ({ ...shopMeta(s), places:s.places, ledger:s.ledger || [] })), geo:cache };
   const n = shops.reduce((t,s) => t + nOrders(s), 0);
   download(new Blob([JSON.stringify(data)], { type:'application/json' }), `etsy-map-backup-${isoDay(new Date())}.json`);
   toast(`💾 Збережено ${shops.length} магазин(и), ${n} замовлень. Файл містить імена покупців — зберігайте його приватно.`, 6000);
@@ -1258,9 +1398,9 @@ async function restoreBackup(data) {
   if (!Array.isArray(data?.shops) || !data.shops.length) return toast('Це не резервна копія карти замовлень.', 4000);
   const n = data.shops.reduce((t,s) => t + (s.places||[]).reduce((u,p) => u + (p.orders||[]).length, 0), 0);
   if (!confirm(`Відновити дані з копії від ${fmtDate(data.exported)}?\n\nУ копії: ${data.shops.length} магазин(и), ${n} замовлень.\nПоточні магазини й замовлення буде замінено.`)) return;
-  for (const s of shops) await kv.del('data:'+s.id);
-  shops = data.shops.map(s => ({ ...s, places: s.places || [], visible: s.visible !== false, loading:false }));
-  for (const s of shops) { s.places.forEach(p => p.key ||= placeKey(p)); computeRepeat(s); await saveData(s); }
+  for (const s of shops) { await kv.del('data:'+s.id); await kv.del('ledger:'+s.id); }
+  shops = data.shops.map(s => ({ ...s, places: s.places || [], ledger: s.ledger || [], visible: s.visible !== false, loading:false }));
+  for (const s of shops) { s.places.forEach(p => p.key ||= placeKey(p)); computeRepeat(s); await saveData(s); await kv.set('ledger:'+s.id, s.ledger); }
   if (data.geo) { cache = { ...cache, ...data.geo }; kv.set('geo', cache); }
   activeId = shops[0].id; saveShops(); closeSheet();
   renderShops(); syncUploadLabel(); refresh(true);
@@ -1365,6 +1505,7 @@ async function loadFile(f) {
   try { data = f.name.toLowerCase().endsWith('.json') ? JSON.parse(t) : parseCSV(t); } catch (e) { return toast('Не вдалося прочитати файл: ' + e.message, 5000); }
   if (data && !Array.isArray(data) && data.app === BACKUP_APP) return restoreBackup(data);
   if (!Array.isArray(data) || !data.length) return toast('У файлі немає замовлень.', 4000);
+  if (isStatement(data)) return loadLedger(activeShop(), data);
   loadInto(activeShop(), data);
 }
 $('file').onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value=''; };
@@ -1397,7 +1538,7 @@ $('clear').onclick = () => { cache = {}; kv.set('geo', cache); toast('Кеш г�
       meta = [{ id:uid(), name:b.name || 'Мій Etsy-магазин', logo:b.logo || '', color:COLORS[0], visible:true }];
     }
     shops = meta;
-    for (const s of shops) { s.places = (await kv.get('data:'+s.id)) || []; s.visible = s.visible !== false; s.loading = false; s.places.forEach(p => p.key ||= placeKey(p)); computeRepeat(s); }
+    for (const s of shops) { s.places = (await kv.get('data:'+s.id)) || []; s.ledger = (await kv.get('ledger:'+s.id)) || []; s.visible = s.visible !== false; s.loading = false; s.places.forEach(p => p.key ||= placeKey(p)); computeRepeat(s); }
     cache = (await kv.get('geo')) || {};
     activeId = shops[0].id; saveShops();
   }
