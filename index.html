@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Карта замовлень Etsy</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff9a3c'/%3E%3Cstop offset='1' stop-color='%23f1641e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M32 53s15-13.2 15-24.5a15 15 0 0 0-30 0C17 39.8 32 53 32 53z' fill='%23fff'/%3E%3Ccircle cx='32' cy='28.5' r='6' fill='%23f1641e'/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#f1641e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Карта Etsy">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
 <style>
@@ -69,7 +75,7 @@
   #kpis { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; flex:none; }
   .neg { color:var(--danger) !important; }
   .pos { color:var(--good) !important; }
-  .kpi { padding:10px 6px; text-align:center; border-radius:14px; min-width:0; cursor:pointer; transition:transform .15s, border-color .15s; }
+  .kpi { padding:10px 6px; text-align:center; border-radius:14px; min-width:0; cursor:pointer; transition:transform .15s, border-color .15s; display:flex; flex-direction:column; justify-content:center; }
   .kpi:hover { transform:translateY(-1px); border-color:var(--accent); }
   .kpi.on { border-color:var(--accent); box-shadow:0 0 0 1.5px var(--accent), var(--shadow); }
   .kpi b { display:block; font-size:17px; letter-spacing:-.02em; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -162,7 +168,7 @@
   .empty { color:var(--muted); padding:16px 8px; text-align:center; }
 
   /* stats */
-  .st-body { overflow:auto; padding:0 16px 16px; }
+  .st-body { overflow:auto; padding:0 16px 16px; flex:1 1 auto; min-height:0; }
   .st-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .chart { margin-top:16px; }
   .bars { display:flex; align-items:flex-end; gap:2px; height:70px; padding-top:4px; }
@@ -203,6 +209,10 @@
   #dlg input[type=text] { width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:transparent; color:var(--fg); font-size:15px; }
   #dlg .logo-row { display:flex; align-items:center; gap:12px; margin:16px 0; }
   #dlg .logo-row .av { width:52px; height:52px; border-radius:16px; font-size:24px; }
+  .logo-pick { position:relative; display:block; flex:none; cursor:pointer; border-radius:16px; }
+  .logo-pick .logo-edit { position:absolute; inset:0; border-radius:16px; display:grid; place-items:center; background:rgba(0,0,0,.45); color:#fff; opacity:0; transition:opacity .15s; }
+  .logo-pick:hover .logo-edit, .logo-pick:focus-within .logo-edit { opacity:1; }
+  #dlgRemoveLogo:hover { color:var(--danger); background:color-mix(in srgb, var(--danger) 12%, transparent); }
   #dlg .hint { margin:5px 0 16px; }
   .swatches { display:flex; gap:8px; margin:6px 0 18px; flex-wrap:wrap; }
   .sw { width:28px; height:28px; border-radius:50%; border:3px solid transparent; background:var(--c); cursor:pointer; outline:1px solid var(--line); }
@@ -233,7 +243,70 @@
   .pinwrap.sel { transform:scale(1.25); filter:drop-shadow(0 0 8px var(--c)) drop-shadow(0 3px 3px rgba(0,0,0,.4)); z-index:9999 !important; }
   .leaflet-tooltip.origin-tip { font-weight:650; border-radius:8px; }
 
+  /* goal bar under the revenue tile */
+  .gbar { display:none; height:4px; border-radius:2px; background:var(--hover); margin:6px 6px 0; overflow:hidden; }
+  .gbar.show { display:block; }
+  .gbar u { display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent2),var(--accent)); border-radius:2px; }
+  /* money sheet */
+  .goal-big b { font-size:28px; font-weight:800; letter-spacing:-.02em; }
+  .goal-big span { color:var(--muted); margin-left:8px; }
+  .prog { position:relative; height:12px; border-radius:99px; background:var(--hover); margin-top:8px; }
+  .prog i { display:block; height:100%; max-width:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
+  .prog em { position:absolute; top:-4px; bottom:-4px; width:2px; margin-left:-1px; background:var(--fg); opacity:.5; border-radius:1px; }
+  .money-in { display:inline-flex; align-items:center; gap:4px; border:1px solid var(--line); border-radius:11px; padding:0 10px; background:var(--solid); flex:none; }
+  .money-in span { color:var(--muted); font-weight:600; }
+  .money-in input { border:0; outline:0; background:transparent; color:var(--fg); font:inherit; font-size:15px; width:110px; padding:8px 0; }
+  .money-in.sm { padding:0 8px; border-radius:9px; }
+  .money-in.sm input { width:58px; font-size:13px; padding:6px 0; }
+  .money-in:focus-within { border-color:var(--accent); }
+  .gform { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .mg { display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid var(--line); }
+  .mg:last-child { border-bottom:0; }
+  .mg .mid { flex:1; min-width:0; }
+  .mg .tt { font-weight:620; font-size:13px; overflow-wrap:anywhere; }
+  .mg .tt a { color:inherit; text-decoration:none; border-bottom:1px dotted var(--muted); }
+  .mg .mm { color:var(--muted); font-size:12px; }
+  .mg-r { width:88px; text-align:right; font-size:13px; flex:none; }
+  .mg-r small { display:block; color:var(--muted); font-size:11px; }
+  body.blurnames .sn { filter:blur(5px); }
+  .muted { color:var(--muted); }
+  .cfg { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; }
+  .cfg label { display:inline-flex; gap:6px; align-items:center; font-size:13px; cursor:pointer; }
+  table.tax { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
+  table.tax th { text-align:right; font-size:10.5px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; padding:6px 4px; }
+  table.tax td { text-align:right; padding:8px 4px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  table.tax th:first-child, table.tax td:first-child { text-align:left; }
+  table.tax tr.tot td { font-weight:800; }
+  .tax-wrap { overflow-x:auto; }
+  @media (max-width:700px) { table.tax { font-size:12px; } table.tax td, table.tax th { padding:7px 2px; } table.tax td small { display:none; } }
+  /* sales calendar */
+  .cal { display:grid; grid-template-rows:repeat(7,1fr); grid-auto-flow:column; grid-auto-columns:1fr; gap:2px; }
+  .cal i { aspect-ratio:1; border-radius:2px; background:var(--hover); cursor:pointer; }
+  .cal i:hover { outline:1.5px solid var(--accent); }
+  .cal i.out { background:transparent; cursor:default; }
+  .cal i.out:hover { outline:0; }
+  .cal i.l1 { background:color-mix(in srgb, var(--accent) 28%, transparent); }
+  .cal i.l2 { background:color-mix(in srgb, var(--accent) 50%, transparent); }
+  .cal i.l3 { background:color-mix(in srgb, var(--accent) 75%, transparent); }
+  .cal i.l4 { background:var(--accent); }
+  /* instant tooltip for small chart cells (the native title shows only after ~1 s) */
+  #tip { position:fixed; z-index:3000; pointer-events:none; background:var(--fg); color:var(--solid); font-size:12px; font-weight:600; padding:4px 9px; border-radius:8px; white-space:nowrap; box-shadow:var(--shadow); opacity:0; transition:opacity .08s; }
+  #tip.show { opacity:1; }
+  /* timelapse badge */
+  #tlBox { position:absolute; z-index:1050; bottom:26px; left:50%; transform:translateX(-50%); width:min(500px, calc(100vw - 28px)); display:none; flex-direction:column; gap:2px; padding:6px 8px 8px; border-radius:18px; user-select:none; }
+  #tlBox.show { display:flex; }
+  #tlBox .tl-row { display:flex; align-items:center; gap:2px; }
+  #tlBox .tl-mid { flex:1; min-width:0; display:flex; align-items:baseline; gap:8px; padding:0 6px; white-space:nowrap; overflow:hidden; }
+  #tlBox b { font-size:16px; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+  #tlBox span { color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; }
+  #tlBox .ib { font-size:18px; font-weight:700; }
+  #tlPlay { background:var(--accent-soft); color:var(--accent) !important; }
+  #tlSpeed { border:1px solid var(--line); background:var(--solid); color:var(--fg); border-radius:9px; font:inherit; font-size:12px; padding:4px 6px; cursor:pointer; }
+  #tlRange { width:100%; margin:2px 0 0; accent-color:var(--accent); cursor:pointer; }
+  @media (min-width:701px) and (max-width:1180px) { #tlBox { bottom:176px; } }
+
   @media (max-width:700px) {
+    #tlBox { top:auto; bottom:46%; }
     #left { top:10px; left:10px; width:calc(100vw - 20px); max-height:calc(100% - 170px); gap:8px; }
     #shopList { max-height:108px; }
     #sheet { top:auto; bottom:0; right:0; left:0; width:100%; max-height:66%; border-radius:22px 22px 0 0; transform:translateY(40px); }
@@ -264,7 +337,7 @@
     <div class="glass kpi"><b id="kOrders">0</b><span>Замовлень</span><i id="dOrders"></i></div>
     <div class="glass kpi"><b id="kCities">0</b><span>Міст</span><i id="dCities"></i></div>
     <div class="glass kpi"><b id="kCountries">0</b><span>Країн</span><i id="dCountries"></i></div>
-    <div class="glass kpi"><b id="kRev">—</b><span>Дохід</span><i id="dRev"></i></div>
+    <div class="glass kpi"><b id="kRev">—</b><span>Дохід</span><i id="dRev"></i><em id="gRev" class="gbar"><u></u></em></div>
     <div class="glass kpi own-only"><b id="kCosts">—</b><span>Витрати</span><i id="dCosts"></i></div>
     <div class="glass kpi own-only"><b id="kProfit">—</b><span>Чистий прибуток</span><i id="dProfit"></i></div>
   </div>
@@ -306,6 +379,8 @@
   <div class="glass">
     <button class="ib" id="routesBtn" title="Маршрути від вашого міста до покупців"></button>
     <button class="ib" id="statsBtn" title="Статистика"></button>
+    <button class="ib own-only" id="moneyBtn" title="Гроші: ціль, собівартість, знижки, податок"></button>
+    <button class="ib" id="playTop" title="Таймлапс: як з'являлися замовлення"></button>
     <button class="ib" id="privacyBtn" title="Приватний режим"></button>
     <button class="ib" id="themeBtn" title="Тема"></button>
     <div id="exportWrap">
@@ -314,6 +389,7 @@
         <button id="expPng">🖼 Зображення мапи (PNG)<small>Для поста чи звіту, з назвою магазину</small></button>
         <button id="expCsv">📄 Замовлення (CSV)<small>Лише ті, що зараз видно на мапі</small></button>
         <button id="expShare" class="own-only">🔗 Посилання для перегляду<small>Мапа без імен покупців — для друзів</small></button>
+        <button id="expInstall">📲 Встановити як застосунок<small>Іконка на телефоні чи в Dock, відкривається без інтернету</small></button>
         <hr class="own-only">
         <button id="expBackup" class="own-only">💾 Резервна копія (JSON)<small>Усі магазини й замовлення в одному файлі</small></button>
         <button id="expRestore" class="own-only">📥 Відновити з копії<small>Замінить поточні дані</small></button>
@@ -323,22 +399,33 @@
 </div>
 
 <div id="bl">
-  <div class="glass" id="legend"><b style="color:var(--fg)">Замовлень у регіоні</b><div class="bar"></div><div class="row"><span>1</span><span id="legendMax"></span></div></div>
+  <div class="glass" id="legend"><div class="row"><b style="color:var(--fg)" id="legendTitle">Замовлень у регіоні</b><button class="link" id="perCapBtn" style="font-size:12px"></button></div><div class="bar"></div><div class="row"><span id="legendMin">1</span><span id="legendMax"></span></div></div>
   <div class="glass seg" id="modes"><button data-d="pins" title="Піни">📍<span class="tx"> Піни</span></button><button data-d="groups" title="Групи">⭕<span class="tx"> Групи</span></button><button data-d="heat" title="Теплова мапа">🔥<span class="tx"> Теплова</span></button><button data-d="regions" title="Регіони: країни й штати">🗺<span class="tx"> Регіони</span></button></div>
   <div class="glass seg" id="layers"><button data-m="map" class="on">Мапа</button><button data-m="sat">Супутник</button><button data-m="terrain">Рельєф</button></div>
 </div>
 
 <div id="sheet" class="glass" aria-live="polite"></div>
+<div id="tlBox" class="glass" title="Прокручуйте тут, щоб гортати дні · ← → · пробіл — пауза">
+  <div class="tl-row">
+    <button class="ib" id="tlPrev" title="Попередній день (←)">‹</button>
+    <button class="ib" id="tlPlay"></button>
+    <button class="ib" id="tlNext" title="Наступний день (→)">›</button>
+    <div class="tl-mid"><b id="tlDate"></b><span id="tlCount"></span></div>
+    <select id="tlSpeed" title="Швидкість"></select>
+    <button class="ib" id="tlStop" title="Закрити таймлапс">✕</button>
+  </div>
+  <input type="range" id="tlRange" min="0" max="0" value="0" aria-label="День таймлапсу">
+</div>
 
 <div id="dlg">
   <div class="box">
-    <h3 id="dlgTitle">Новий магазин</h3>
+    <div class="row" style="margin:-4px -6px 12px 0"><h3 id="dlgTitle" style="margin:0">Новий магазин</h3><button class="ib" id="dlgClose" title="Закрити (Esc)">✕</button></div>
     <label class="f">Назва магазину</label>
     <input type="text" id="dlgName" maxlength="40" placeholder="Наприклад, My Handmade Shop">
     <div class="logo-row">
-      <div class="av" id="dlgAv"></div>
-      <label class="btn">Завантажити логотип<input id="dlgFile" type="file" accept="image/*" hidden></label>
-      <button class="link" id="dlgRemoveLogo">Прибрати</button>
+      <label class="logo-pick" title="Змінити логотип"><div class="av" id="dlgAv"></div><span class="logo-edit"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span><input id="dlgFile" type="file" accept="image/*" hidden></label>
+      <div class="hint" id="dlgLogoHint" style="flex:1;margin:0"></div>
+      <button class="ib" id="dlgRemoveLogo" title="Прибрати логотип"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
     </div>
     <div class="row"><label class="f" style="margin:0">Колір пінів</label><button class="link" id="dlgFromLogo" style="display:none">🎨 Взяти з логотипа</button></div>
     <div class="swatches" id="swatches"></div>
@@ -421,6 +508,9 @@ const ICON = {
   moon:   svg('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
   filter: svg('<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>'),
   chevron: svg('<path d="M6 15l6-6 6 6"/>'),
+  wallet: svg('<path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v3"/><path d="M3 6v12a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-3"/><path d="M21 12h-4a2 2 0 0 0 0 4h4z"/>'),
+  play:   svg('<path d="M7 4.5v15l12.5-7.5z"/>'),
+  pause:  svg('<path d="M8 5v14M16 5v14"/>'),
   eye:    svg('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
   eyeOff: svg('<path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17.8 17.8 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.9 0 3.6-.6 5-1.4"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'),
 };
@@ -470,6 +560,8 @@ let dlgShop = null, draft = {};
 function dlgRender() {
   const tmp = { ...draft, name: $('dlgName').value || draft.name };
   $('dlgAv').outerHTML = avatarHTML(tmp).replace('class="av"','class="av" id="dlgAv"');
+  $('dlgRemoveLogo').style.visibility = draft.logo ? '' : 'hidden';
+  $('dlgLogoHint').textContent = draft.logo ? 'Наведіть на логотип і натисніть, щоб замінити.' : 'Натисніть на квадрат, щоб завантажити логотип.';
   const sw = $('swatches'); sw.innerHTML='';
   COLORS.forEach(c => { const b=document.createElement('button'); b.className='sw'+(c===draft.color?' on':''); b.style.setProperty('--c',c); b.onclick=()=>{ draft.color=c; dlgRender(); }; sw.appendChild(b); });
   const custom = !COLORS.includes(draft.color);
@@ -525,7 +617,8 @@ function openDlg(shop) {
 $('addShop').onclick = () => openDlg(null);
 $('dlgName').oninput = () => !draft.logo && dlgRender();
 $('dlgRemoveLogo').onclick = () => { draft.logo=''; dlgRender(); };
-$('dlgCancel').onclick = () => $('dlg').classList.remove('open');
+$('dlgCancel').onclick = $('dlgClose').onclick = () => $('dlg').classList.remove('open');
+$('dlg').onclick = e => { if (e.target === $('dlg')) $('dlg').classList.remove('open'); }; // click on the dimmed backdrop
 $('dlg').onclick = e => { if (e.target.id==='dlg') $('dlg').classList.remove('open'); };
 $('dlgSave').onclick = async () => {
   const name = $('dlgName').value.trim() || 'Магазин ' + (shops.length + (dlgShop?0:1));
@@ -630,13 +723,16 @@ function normalize(o) {
       discount: pick(o, ['order total','order value','total']) || !pick(o, ['item total']) ? num(pick(o, ['discount amount','discount','discount_amt'])) : null,
       shipping: num(pick(o, ['shipping','order shipping','shipping_cost'])),
       currency: pick(o, ['currency']) || 'USD',
+      coupon: pick(o, ['coupon code']) || '',
+      couponInfo: pick(o, ['coupon details']) || '',
+      shipped: pick(o, ['date shipped','shipped_date']) || '',
     },
   };
 }
 // combine the same order coming from different exports (e.g. "Sold Orders" + "Sold Order Items")
 function mergeOrder(o, n) {
   const m = { ...o };
-  ['date','buyer','currency'].forEach(k => { if (n[k]) m[k] = n[k]; });
+  ['date','buyer','currency','coupon','couponInfo','shipped'].forEach(k => { if (n[k]) m[k] = n[k]; });
   if (n.items?.length) m.items = n.items;
   if (n.itemsCount != null) m.itemsCount = n.itemsCount;
   if (n.shipping != null) m.shipping = n.shipping;
@@ -645,6 +741,18 @@ function mergeOrder(o, n) {
   return m;
 }
 const itemsOf = o => (o.items||[]).map(i => typeof i==='string' ? {t:i} : i);
+// one order line: price before discount (p), the discount on it (disc) and what the buyer actually paid
+// (per-item discount when the file has it, otherwise the order's discount split by item price)
+function linePaid(it, o) {
+  const its = itemsOf(o);
+  if (it.p == null) { const v = its.length === 1 && o.total != null ? o.total - (o.itemLevel ? 0 : (o.shipping || 0)) : null; return { p:null, disc:0, paid: v != null && v >= 0 ? v : null }; }
+  const sumP = its.reduce((s, x) => s + (x.p || 0), 0);
+  const share = !its.some(x => x.d > 0) && o.discount > 0 && it.p > 0 && sumP > 0 ? o.discount * it.p / sumP : 0;
+  const disc = Math.min(it.d > 0 ? it.d : share, it.p);
+  return { p:it.p, disc, paid:it.p - disc };
+}
+const orderDiscount = o => o.discount > 0 ? o.discount : itemsOf(o).reduce((s, it) => s + (it.d > 0 ? it.d : 0), 0);
+const shipDays = o => { const a = Date.parse(o.date), b = Date.parse(o.shipped); if (isNaN(a) || isNaN(b) || b < a - 864e5) return null; return Math.max(0, Math.round((b - a) / 864e5)); };
 const itemKey = it => it.id || it.t || '';
 const fmtDate = s => { const t = Date.parse(s); return isNaN(t) ? (s||'') : new Date(t).toLocaleDateString('uk-UA',{day:'numeric',month:'short',year:'numeric'}); };
 const fmtKm = km => Math.round(km).toLocaleString('uk-UA') + ' км';
@@ -685,12 +793,13 @@ function sumMoney(orders, compact=false, field='total') {
 
 // ================= Etsy monthly statement (fees, ads, labels, refunds → expenses and net profit) =================
 // Shop Manager → Finances → Monthly statements → Download CSV: Date, Type, Title, Info, Currency, Amount, Fees & Taxes, Net
-const COST_CATS = { transaction:'Комісія за продаж', processing:'Обробка платежів', listing:'Розміщення лістингів', ads:'Реклама', labels:'Етикетки доставки', refund:'Повернення покупцям', tax:'Податки', other:'Інші збори Etsy' };
+const COST_CATS = { cogs:'Собівартість товарів', transaction:'Комісія за продаж', processing:'Обробка платежів', listing:'Розміщення лістингів', ads:'Реклама', labels:'Етикетки доставки', refund:'Повернення покупцям', tax:'Податки', other:'Інші збори Etsy' };
 const isStatement = rows => { const k = Object.keys(rows[0] || {}); return k.includes('type') && k.includes('net') && !k.includes('order id') && !k.includes('sale date'); };
 const numSigned = v => { const s = String(v ?? '').trim(); const n = num(s); return n == null ? null : (/^\(.*\)$/.test(s) && n > 0 ? -n : n); };
 function ledgerCat(type, title) {
   const t = (type||'').toLowerCase(), s = (title||'').toLowerCase();
-  if (/deposit|payment|transfer|payout/.test(t)) return null; // money moved to the bank or bills paid — not income or costs
+  if (/deposit/.test(t)) return 'deposit'; // payout to the bank: not income or costs, but the base for income tax
+  if (/payment|transfer|payout/.test(t)) return null; // bills paid etc. — not income or costs
   if (t === 'sale') return 'sale';
   if (/refund/.test(t) || /refund/.test(s)) return 'refund';
   if (/transaction fee/.test(s)) return 'transaction';
@@ -707,6 +816,10 @@ function parseLedger(rows) {
     const t = Date.parse(pick(r, ['date']));
     let net = numSigned(pick(r, ['net']));
     if (net == null) { const a = numSigned(pick(r, ['amount'])), f = numSigned(pick(r, ['fees & taxes','fees and taxes'])); if (a != null || f != null) net = (a||0) + (f||0); }
+    if (/deposit/i.test(type)) { // the amount usually lives only in the title: "$1,234.56 sent to your bank account"
+      const m = String(title).match(/(\d[\d,]*(?:\.\d+)?)/);
+      net = net ? Math.abs(net) : m ? parseFloat(m[1].replace(/,/g, '')) : null;
+    }
     return { date: isNaN(t) ? '' : new Date(t).toISOString(), type, title, info, net, currency: pick(r, ['currency']) || 'USD',
       orderId: (info.match(/order\s*#?\s*(\d+)/i) || title.match(/order\s*#?\s*(\d+)/i) || [])[1] || '', cat: ledgerCat(type, title) };
   }).filter(x => x.date && x.net != null && x.cat);
@@ -716,13 +829,23 @@ function ledgerEntries(b = rangeBounds()) {
   const other = filt.q || filt.countries.size || filt.repeat || filt.item;
   const ids = other ? new Set(visibleEntries(b).flatMap(e => e.orders.map(o => o.id))) : null;
   return shops.filter(s => s.visible).flatMap(s => (s.ledger || []).filter(r => {
+    if (r.cat === 'deposit') return false;
     const t = Date.parse(r.date); if (b && !(t >= b[0] && t < b[1])) return false;
     return !ids || (r.orderId && ids.has(r.orderId));
   }));
 }
+// unit costs the seller entered per listing (Гроші → Собівартість), kept per shop
+const unitCost = (shop, it) => { const v = shop.costs?.[itemKey(it)]; return typeof v === 'number' && v >= 0 ? v : null; };
+function cogsRows(entries) {
+  const out = [];
+  entries.forEach(e => e.orders.forEach(o => itemsOf(o).forEach(it => { const c = unitCost(e.shop, it); if (c != null) out.push({ currency:o.currency || 'USD', v:c * (it.q || 1) }); })));
+  return out;
+}
 function financeOf(b) {
-  const rows = ledgerEntries(b);
-  return { rows, cost: moneyAgg(rows.filter(r => r.cat !== 'sale').map(r => ({ currency:r.currency, v:-r.net })), 'v'), profit: moneyAgg(rows, 'net') };
+  const rows = ledgerEntries(b), cogs = viewOnly ? [] : cogsRows(visibleEntries(b));
+  return { rows, cogs,
+    cost: moneyAgg([...rows.filter(r => r.cat !== 'sale').map(r => ({ currency:r.currency, v:-r.net })), ...cogs], 'v'),
+    profit: moneyAgg([...rows.map(r => ({ currency:r.currency, v:r.net })), ...cogs.map(c => ({ currency:c.currency, v:-c.v }))], 'v') };
 }
 const fmtAgg = a => a.n ? fmtMoney(a.v, a.cur) + (a.miss ? '*' : '') : '—';
 const hasLedger = () => shops.some(s => s.visible && s.ledger?.length);
@@ -850,9 +973,9 @@ function renderRangeUI() {
   $('dFrom').value = filt.from; $('dTo').value = filt.to;
   $('rangeNote').textContent = filt.range==='all' ? '' : rangeLabel();
   const cb = $('cmpChips'); cb.innerHTML = '';
-  [['prev','Попереднім періодом'],['yoy','Тим самим періодом торік']].forEach(([k,l]) => { const b = document.createElement('button'); b.className = 'chip'+(filt.cmp===k?' on':''); b.textContent = l; b.onclick = () => { filt.cmp = k; ls.set('etsyCmp', k); renderRangeUI(); redraw(false); }; cb.appendChild(b); });
+  [['prev','Попереднім періодом','Такий самий відрізок часу безпосередньо перед обраним періодом'],['yoy','Тим самим торік','Ті самі дати рік тому']].forEach(([k,l,t]) => { const b = document.createElement('button'); b.className = 'chip'+(filt.cmp===k?' on':''); b.textContent = l; b.title = t; b.onclick = () => { filt.cmp = k; ls.set('etsyCmp', k); renderRangeUI(); redraw(false); }; cb.appendChild(b); });
   const c = compareBounds();
-  if (!c) cb.insertAdjacentHTML('beforeend', '<div class="hint" style="width:100%">Оберіть період вище — тоді біля цифр з\'явиться зміна у %.</div>');
+  if (!c) cb.insertAdjacentHTML('beforeend', '<div class="hint" style="width:100%">Оберіть період — біля цифр з\'явиться зміна у %.</div>');
   else cb.insertAdjacentHTML('beforeend', `<div class="hint" style="width:100%">Порівнюємо з ${esc(boundsLabel(c))}</div>`);
 }
 $('dFrom').onchange = e => { stopPlay(); setRange('custom', e.target.value, filt.to); };
@@ -951,13 +1074,20 @@ function featureCountry(p) { // English country name for a Natural Earth feature
   const code = p.ISO_A2_EH && p.ISO_A2_EH !== '-99' ? p.ISO_A2_EH : p.ISO_A2;
   return code && code !== '-99' ? countryName(code) : p.ADMIN;
 }
+let perCap = ls.get('etsyPerCap') === '1'; // colour US states by orders per 1M residents instead of raw counts
+$('perCapBtn').onclick = () => { perCap = !perCap; ls.set('etsyPerCap', perCap ? '1' : '0'); redraw(false); };
 function drawRegions(vis) {
   const byCountry = new Map(), byState = new Map();
   vis.forEach(e => { const n = e.orders.length; byCountry.set(e.place.country, (byCountry.get(e.place.country)||0) + n); if (isUS(e.place.country)) { const sc = stateCode(e.place.state); if (sc) byState.set(sc, (byState.get(sc)||0) + n); } });
-  const max = Math.max(1, ...byCountry.values(), ...byState.values()), scale = n => Math.log(1+n) / Math.log(1+max);
-  $('legendMax').textContent = max; $('legend').classList.add('show');
+  const pc = perCap && byState.size > 0, stVal = sc => pc ? (byState.get(sc) || 0) / (US[sc]?.[1] || 1) : (byState.get(sc) || 0);
+  const max = Math.max(1, ...byCountry.values(), ...byState.values()), maxS = pc ? Math.max(.01, ...[...byState.keys()].map(stVal)) : max;
+  const scale = (n, mx) => pc && mx === maxS ? n / mx : Math.log(1+n) / Math.log(1+mx);
+  $('legendMax').textContent = pc ? maxS.toFixed(1) : max; $('legendMin').textContent = pc ? '0' : '1';
+  $('legendTitle').textContent = pc ? 'Замовлень на 1 млн жителів' : 'Замовлень у регіоні';
+  $('perCapBtn').style.display = byState.size ? '' : 'none'; $('perCapBtn').textContent = pc ? 'Кількість' : 'На 1 млн жителів';
+  $('legend').classList.add('show');
   const dark = theme === 'dark', edge = dark ? '#1b1b1d' : '#fff', faint = dark ? 'rgba(255,255,255,.16)' : 'rgba(0,0,0,.18)';
-  const style = n => n ? { fillColor:heatColor(scale(n)), fillOpacity:.8, color:edge, weight:1 } : { fillOpacity:0, color:faint, weight:.6 };
+  const style = (n, mx = max) => n ? { fillColor:heatColor(scale(n, mx)), fillOpacity:.8, color:edge, weight:1 } : { fillOpacity:0, color:faint, weight:.6 };
   L.geoJSON(regionsGeo.c, {
     bubblingMouseEvents:false,
     style: f => { const c = featureCountry(f.properties); return isUS(c) && byState.size ? { fillOpacity:0, color:faint, weight:.8 } : style(byCountry.get(c)||0); },
@@ -970,7 +1100,7 @@ function drawRegions(vis) {
   }).addTo(regionLayer);
   if (byState.size) L.geoJSON(regionsGeo.s, {
     bubblingMouseEvents:false,
-    style: f => style(byState.get(f.properties.postal) || 0),
+    style: f => style(stVal(f.properties.postal), maxS),
     onEachFeature: (f, layer) => {
       const sc = f.properties.postal, n = byState.get(sc) || 0, per = US[sc] ? n / US[sc][1] : 0;
       layer.bindTooltip(`<b>${esc(f.properties.name)}</b><br>${n} замовлень${n ? ` · ${per.toFixed(1)} на 1 млн жителів` : ''}`, { sticky:true });
@@ -1044,6 +1174,7 @@ function redraw(fit=false) {
     showDelta('dRev', ra.cur === rp.cur || !rp.n ? pctDelta(ra.v, rp.n ? rp.v : 0) : null, `${lbl}: ${sumMoney(pAll)}`);
   } else ['dOrders','dCities','dCountries','dRev'].forEach(id => showDelta(id, null));
   if (!viewOnly) updateFinanceKPIs(cb);
+  updateGoalBar();
   if (fit && vis.length) {
     const pts = vis.map(e => [e.place.lat, e.place.lng]);
     if (routesOn) shops.forEach(s => { if (s.visible && s.origin) pts.push([s.origin.lat, s.origin.lng]); });
@@ -1059,6 +1190,7 @@ function refresh(fit=false) {
   buildFilterUI(); redraw(fit);
   if (sheet === 'stats') renderStats();
   else if (sheet === 'list') renderList();
+  else if (sheet === 'money') renderMoney();
   else if (sheet === 'place' && selected) { const e = visibleEntries().find(x => x.place === selected.place); e ? openPlace(e, false) : closeSheet(); }
 }
 
@@ -1069,13 +1201,16 @@ document.querySelectorAll('#modes button').forEach(b => {
 function syncTopButtons() {
   $('routesBtn').innerHTML = ICON.route; $('routesBtn').classList.toggle('on', routesOn);
   $('statsBtn').innerHTML = ICON.stats; $('statsBtn').classList.toggle('on', sheet === 'stats');
+  $('moneyBtn').innerHTML = ICON.wallet; $('moneyBtn').classList.toggle('on', sheet === 'money');
+  $('playTop').innerHTML = playTimer ? ICON.pause : ICON.play; $('playTop').classList.toggle('on', !!tl);
+  if ($('playBtn')) $('playBtn').textContent = playTimer ? '⏸ Пауза' : tl ? '▶ Продовжити' : '▶ Таймлапс на мапі';
   $('privacyBtn').innerHTML = privacy ? ICON.lock : ICON.unlock; $('privacyBtn').classList.toggle('on', privacy);
   $('privacyBtn').title = privacy ? 'Приватний режим увімкнено: імена покупців сховані' : 'Приватний режим: сховати імена покупців';
   $('exportBtn').innerHTML = ICON.download;
   $('toggleFilters').innerHTML = ICON.filter;
   $('themeBtn').innerHTML = theme === 'dark' ? ICON.sun : ICON.moon;
   $('themeBtn').title = theme === 'dark' ? 'Світла тема' : 'Темна тема';
-  document.querySelectorAll('#kpis .kpi').forEach((el, i) => el.classList.toggle('on', sheet === 'list' && listTab === KPI_TABS[i]));
+  document.querySelectorAll('#kpis .kpi').forEach((el, i) => el.classList.toggle('on', goalTile(i) ? sheet === 'money' && moneyTab === 'goal' : sheet === 'list' && listTab === KPI_TABS[i]));
   $('q').placeholder = privacy ? 'Пошук міста, штату чи країни' : 'Пошук міста, країни чи покупця';
 }
 $('routesBtn').onclick = () => {
@@ -1084,6 +1219,8 @@ $('routesBtn').onclick = () => {
 };
 $('privacyBtn').onclick = () => { privacy = !privacy; ls.set('etsyPrivacy', privacy ? '1' : '0'); syncTopButtons(); refresh(false); toast(privacy ? '🔒 Імена покупців сховані — можна показувати мапу іншим.' : 'Імена покупців знову видно.', 3000); };
 $('statsBtn').onclick = () => sheet === 'stats' ? closeSheet() : openStats();
+$('moneyBtn').onclick = () => sheet === 'money' ? closeSheet() : openMoney();
+$('playTop').onclick = () => togglePlay();
 $('themeBtn').onclick = () => {
   theme = theme === 'dark' ? 'light' : 'dark'; ls.set('etsyTheme2', theme);
   document.documentElement.dataset.theme = theme; setBase(); syncTopButtons(); redraw(false);
@@ -1094,6 +1231,7 @@ const menuAct = fn => () => { $('exportMenu').classList.remove('open'); fn(); };
 $('expPng').onclick = menuAct(() => exportPNG());
 $('expCsv').onclick = menuAct(() => exportCSV());
 $('expShare').onclick = menuAct(() => shareLink());
+$('expInstall').onclick = menuAct(() => installApp());
 $('expBackup').onclick = menuAct(() => exportBackup());
 $('expRestore').onclick = menuAct(() => $('restoreFile').click());
 
@@ -1102,14 +1240,14 @@ function openSheet(kind, color) {
   sheet = kind; const m = $('sheet'); m.style.setProperty('--c', color || 'var(--accent)'); m.classList.add('open'); syncTopButtons();
 }
 function closeSheet() {
-  if (!sheet) return; stopPlay(); const wasSel = !!selected;
+  if (!sheet) return; const wasSel = !!selected; $('sheet').dataset.kind = ''; $('sheet').style.minHeight = '';
   sheet = null; selected = null; $('sheet').classList.remove('open'); syncTopButtons(); if (wasSel) redraw(false);
 }
 map.on('click', closeSheet);
 document.addEventListener('keydown', e => { if (e.key==='Escape') { closeSheet(); $('dlg').classList.remove('open'); $('exportMenu').classList.remove('open'); } });
 
 function openPlace(e, pan=true) {
-  stopPlay();
+  pausePlay();
   const changed = selected?.place !== e.place;
   selected = e; const { shop, place:p } = e;
   const sorted = [...e.orders].sort((a,b) => (Date.parse(b.date)||0) - (Date.parse(a.date)||0));
@@ -1153,8 +1291,12 @@ function focusEntry(e) { map.setView([e.place.lat, e.place.lng], Math.max(map.ge
 
 // ================= right sheet: details behind the KPI tiles =================
 const LIST_MAX = 300;
-document.querySelectorAll('#kpis .kpi').forEach((el, i) => el.onclick = () => sheet === 'list' && listTab === KPI_TABS[i] ? closeSheet() : openList(KPI_TABS[i]));
-function openList(tab) { stopPlay(); listTab = tab; if (selected) { selected = null; redraw(false); } openSheet('list'); renderList(); }
+const goalTile = i => i === 3 && !viewOnly && goal.amount > 0; // with a revenue goal the revenue tile opens Гроші → Ціль
+document.querySelectorAll('#kpis .kpi').forEach((el, i) => el.onclick = () => {
+  if (goalTile(i)) { if (sheet === 'money' && moneyTab === 'goal') return closeSheet(); moneyTab = 'goal'; ls.set('etsyMoneyTab', moneyTab); return sheet === 'money' ? renderMoney() : openMoney(); }
+  sheet === 'list' && listTab === KPI_TABS[i] ? closeSheet() : openList(KPI_TABS[i]);
+});
+function openList(tab) { pausePlay(); listTab = tab; if (selected) { selected = null; redraw(false); } openSheet('list'); renderList(); }
 function renderList() {
   const vis = visibleEntries();
   const orders = vis.flatMap(e => e.orders.map(o => ({ o, e }))).sort((a,b) => (Date.parse(b.o.date)||0) - (Date.parse(a.o.date)||0));
@@ -1183,14 +1325,16 @@ function renderList() {
     if (!hasLedger()) {
       body = `<div class="empty" style="text-align:left;line-height:1.7">Комісії й витрати Etsy є у щомісячній виписці:<br>1. Shop Manager → <b>Finances</b> → <b>Monthly statements</b><br>2. Виберіть місяць → <b>Download CSV</b><br>3. Тут натисніть ⬆ біля магазину й виберіть цей файл.<br><br>Можна завантажити кілька місяців — дублі не з'являться.</div>`;
     } else {
+      const f = financeOf(rangeBounds());
       const byCat = new Map(); ledgerRows.filter(r => r.cat !== 'sale').forEach(r => { if (!byCat.has(r.cat)) byCat.set(r.cat, []); byCat.get(r.cat).push({ currency:r.currency, v:-r.net }); });
+      if (f.cogs.length) byCat.set('cogs', f.cogs);
       const cats = [...byCat].map(([c, list]) => ({ c, a:moneyAgg(list, 'v') })).filter(x => Math.abs(x.a.v) >= .005).sort((a,b) => b.a.v - a.a.v);
-      const mx = Math.max(.01, ...cats.map(x => Math.abs(x.a.v))), f = financeOf(rangeBounds());
+      const mx = Math.max(.01, ...cats.map(x => Math.abs(x.a.v)));
       body = `<div class="st-grid" style="padding:0 6px 10px"><div class="m-stat"><b class="${f.cost.n && f.cost.v > 0 ? 'neg' : ''}">${f.cost.n && f.cost.v > 0 ? '-' : ''}${esc(fmtAgg(f.cost))}</b><span>Витрати</span></div><div class="m-stat"><b class="${f.profit.n && f.profit.v < 0 ? 'neg' : f.profit.n && f.profit.v > 0 ? 'pos' : ''}">${f.profit.n && f.profit.v > 0 ? '+' : ''}${esc(fmtAgg(f.profit))}</b><span>Чистий прибуток</span></div></div>`
         + rankHTML(cats.map(x => ({ name:esc(COST_CATS[x.c] || x.c), val:esc(fmtMoney(x.a.v, x.a.cur)), share:Math.abs(x.a.v)/mx })))
         + `<div class="m-h">Рядки виписки</div>`
         + ledgerRows.slice(0, LIST_MAX).map(r => `<div class="order"><div class="ic">${r.cat === 'sale' ? '💰' : '🧾'}</div><div class="mid"><div class="tt">${esc(r.title || r.type)}</div><div class="mm">${esc([fmtDate(r.date), r.type, r.info].filter(Boolean).join(' · '))}</div></div><div class="pr${r.net < 0 ? ' neg' : r.net > 0 ? ' pos' : ''}">${r.net > 0 ? '+' : ''}${priceHTML(r.net, r.currency)}</div></div>`).join('');
-      note = 'З виписки Etsy. Прибуток = продажі мінус комісії, реклама, етикетки й повернення — без вашої собівартості.'
+      note = 'З виписки Etsy. Прибуток = продажі мінус комісії, реклама, етикетки й повернення' + (f.cogs.length ? ' та собівартість товарів (💰 Гроші → Собівартість).' : '. Собівартість товарів можна додати в 💰 Гроші → Собівартість.')
         + (filt.q || filt.countries.size || filt.repeat || filt.item ? ' З активними фільтрами враховано лише збори, пов\'язані з видимими замовленнями.' : '');
     }
   } else {
@@ -1200,9 +1344,7 @@ function renderList() {
       const meta = [fmtDate(o.date), [e.place.city, e.place.country].filter(Boolean).join(', '), o.id ? '#'+o.id : '', it.q > 1 ? `× ${it.q}` : ''].filter(Boolean).map(esc).join(' · ');
       // discounted line: old price struck through, price actually paid, and the discount in %
       // per-item discount if the file has it, otherwise the order's discount split by item price
-      const its = itemsOf(o), sumP = its.reduce((s, x) => s + (x.p || 0), 0);
-      const share = !its.some(x => x.d > 0) && o.discount > 0 && it.p > 0 && sumP > 0 ? o.discount * it.p / sumP : 0;
-      const disc = it.p != null ? Math.min(it.d > 0 ? it.d : share, it.p) : 0;
+      const disc = linePaid(it, o).disc;
       const price = disc
         ? `<s class="old">${esc(fmtMoney(it.p, o.currency))}</s>${priceHTML(it.p - disc, o.currency)}<span class="disc">−${Math.round(disc / it.p * 100)}%</span>`
         : priceHTML(linePrice, o.currency);
@@ -1241,17 +1383,78 @@ function monthsOf(entries) {
   return out.slice(-48);
 }
 const monthEnd = k => { const [y,m] = k.split('-').map(Number); return isoDay(new Date(y, m, 0)); };
-function stopPlay() { if (playTimer) { clearInterval(playTimer); playTimer = null; if (sheet === 'stats') renderStats(); } }
-function play() {
-  const months = monthsOf(visibleEntries(null)); if (!months.length) return;
-  stopPlay(); let i = 0; const from = months[0].k + '-01';
-  const step = () => {
-    filt.range = 'custom'; filt.from = from; filt.to = monthEnd(months[i].k); renderRangeUI(); buildFilterUI(); redraw(i===0);
-    renderStats(months[i].k);
-    if (++i >= months.length) { clearInterval(playTimer); playTimer = null; renderStats(); }
-  };
-  step(); if (months.length > 1) playTimer = setInterval(step, 700);
+// timelapse player: orders appear day by day (default 1 day per second); pause keeps the current day,
+// the slider / mouse wheel / ← → move between days, ✕ closes and brings back the previous period
+const TL_SPEEDS = [[.5,'½ дня/с'],[1,'1 день/с'],[2,'2 дні/с'],[5,'5 днів/с'],[10,'10 днів/с'],[30,'30 днів/с']];
+let playSaved = null, tl = null, tlSpeed = TL_SPEEDS.some(x => x[0] === +ls.get('etsyTlSpeed')) ? +ls.get('etsyTlSpeed') : 1;
+$('tlSpeed').innerHTML = TL_SPEEDS.map(([v,l]) => `<option value="${v}"${v === tlSpeed ? ' selected' : ''}>${l}</option>`).join('');
+function tlShow(i) {
+  if (!tl) return;
+  tl.i = Math.max(0, Math.min(tl.days - 1, i));
+  const s = tl.start, day = new Date(s.getFullYear(), s.getMonth(), s.getDate() + tl.i);
+  filt.range = 'custom'; filt.from = isoDay(s); filt.to = isoDay(day);
+  renderRangeUI(); buildFilterUI(); redraw(false);
+  const endMs = +new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+  $('tlDate').textContent = day.toLocaleDateString('uk-UA', { day:'numeric', month:'long', year:'numeric' });
+  $('tlCount').textContent = `${tl.ts.filter(t => t < endMs).length} замовлень`;
+  $('tlRange').value = tl.i;
+  if (sheet === 'stats') { const mk = monthKey(+day); if (mk !== tl.mk) { tl.mk = mk; renderStats(mk); } }
+  else if (sheet === 'list') renderList();
+  else if (sheet === 'money') renderMoney();
 }
+function syncPlay() {
+  $('tlPlay').innerHTML = playTimer ? ICON.pause : ICON.play;
+  $('tlPlay').title = playTimer ? 'Пауза (пробіл)' : 'Відтворити (пробіл)';
+  syncTopButtons();
+}
+function pausePlay() { if (!playTimer) return; clearInterval(playTimer); playTimer = null; syncPlay(); }
+function resumePlay() {
+  if (!tl) return play();
+  if (tl.i >= tl.days - 1) tlShow(0); // at the end: start over
+  clearInterval(playTimer);
+  playTimer = setInterval(() => { tlShow(tl.i + 1); if (tl.i >= tl.days - 1) pausePlay(); }, 1000 / tlSpeed);
+  syncPlay();
+}
+const togglePlay = () => !tl ? play() : playTimer ? pausePlay() : resumePlay();
+function stopPlay(restore = true) {
+  if (!tl) return;
+  clearInterval(playTimer); playTimer = null; tl = null;
+  $('tlBox').classList.remove('show'); syncPlay();
+  const s = playSaved; playSaved = null;
+  if (restore && s) { Object.assign(filt, s); renderRangeUI(); refresh(false); }
+  else if (sheet === 'stats') renderStats();
+}
+function play() {
+  const ts = visibleEntries(null).flatMap(e => e.orders).map(o => Date.parse(o.date)).filter(t => !isNaN(t)).sort((a,b) => a-b);
+  if (!ts.length) return toast('Немає дат замовлень для таймлапсу.', 3000);
+  stopPlay();
+  playSaved = { range:filt.range, from:filt.from, to:filt.to };
+  const f = new Date(ts[0]), l = new Date(ts[ts.length-1]), start = new Date(f.getFullYear(), f.getMonth(), f.getDate());
+  const days = Math.round((+new Date(l.getFullYear(), l.getMonth(), l.getDate()) - start) / 864e5) + 1;
+  tl = { start, days, ts, i:0, mk:'' };
+  $('tlRange').max = days - 1; $('tlBox').classList.add('show');
+  filt.range = 'all'; buildFilterUI(); redraw(true); // frame every pin first, then grow from day one
+  tlShow(0); resumePlay();
+}
+$('tlPlay').onclick = () => togglePlay();
+$('tlPrev').onclick = () => { pausePlay(); tlShow(tl.i - 1); };
+$('tlNext').onclick = () => { pausePlay(); tlShow(tl.i + 1); };
+$('tlStop').onclick = () => stopPlay();
+$('tlRange').oninput = e => { pausePlay(); tlShow(+e.target.value); };
+$('tlSpeed').onchange = e => { tlSpeed = +e.target.value; ls.set('etsyTlSpeed', String(tlSpeed)); if (playTimer) resumePlay(); };
+let tlWheel = 0; // trackpads send many small deltas: one day per ~40px
+$('tlBox').addEventListener('wheel', e => {
+  if (!tl) return; e.preventDefault();
+  tlWheel += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  const step = Math.trunc(tlWheel / 40); if (!step) return;
+  tlWheel -= step * 40; pausePlay(); tlShow(tl.i + step);
+}, { passive:false });
+document.addEventListener('keydown', e => {
+  if (!tl || e.target.closest?.('input:not([type=range]), textarea, select')) return;
+  if (e.key === ' ' && e.target.closest?.('button')) return; // a focused button already reacts to space
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); pausePlay(); tlShow(tl.i + (e.key === 'ArrowRight' ? 1 : -1)); }
+  else if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
 // seasonality over all time (date filter ignored): weekday bars + month-of-year bars for the last 3 years
 function seasonHTML(entries) {
   const dow = Array(7).fill(0), years = new Map();
@@ -1269,22 +1472,67 @@ function seasonHTML(entries) {
       <div class="lgd">${ys.map((y,i) => `<span><b style="background:${YEAR_COLORS[i]}"></b>${y}</span>`).join('')}</div></div>`;
 }
 
+// GitHub-style calendar of the selected period (date filter); "all time" = first order … today
+function calendarHTML(entries) {
+  const counts = new Map(); let first = Infinity, last = -Infinity;
+  entries.forEach(e => e.orders.forEach(o => { const t = Date.parse(o.date); if (isNaN(t)) return; const k = isoDay(new Date(t)); counts.set(k, (counts.get(k)||0) + 1); first = Math.min(first, t); last = Math.max(last, t); }));
+  if (!counts.size) return '';
+  const day0 = t => { const d = new Date(t); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
+  const b = rangeBounds(), now = Date.now();
+  let from = day0(b && b[0] > -8e15 ? b[0] : first), to = day0(b && b[1] < 8e15 ? b[1] - 1 : Math.max(now, last));
+  if (to - from > 731 * 864e5) from = new Date(to.getFullYear() - 2, to.getMonth(), to.getDate() + 1); // at most 2 years, or the cells get too small
+  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate() - (from.getDay()+6)%7); // Monday of the first week
+  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate() + (7 - (to.getDay()+6)%7) - 1); // Sunday of the last week
+  const cells = []; let mx = 1, active = 0, best = null;
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
+    const k = isoDay(d), inside = d >= from && d <= to, c = inside ? counts.get(k) || 0 : 0;
+    if (c) { active++; if (!best || c > best[1]) best = [k, c]; mx = Math.max(mx, c); }
+    cells.push([k, c, inside]);
+  }
+  const weeks = cells.length / 7, lvl = c => !c ? 0 : Math.min(4, Math.ceil(c / mx * 4));
+  const label = d => d.toLocaleDateString('uk-UA', { day:'numeric', month:'short', year:'numeric' });
+  return `<div class="chart"><div class="lbl" style="margin:0 0 6px">Календар продажів · ${active} дн. з продажами${best ? ` · рекорд ${best[1]} (${fmtDay(parseDay(best[0]))})` : ''}</div>
+    <div class="cal" id="calGrid" style="grid-auto-columns:${weeks <= 10 ? '24px' : weeks < 26 ? '15px' : 'minmax(0,1fr)'}${weeks <= 10 ? ';gap:3px' : ''}">${cells.map(([k,c,inside]) => inside
+      ? `<i class="l${lvl(c)}" data-d="${k}" data-tip="${esc(parseDay(k).toLocaleDateString('uk-UA', { weekday:'short', day:'numeric', month:'short', year:'numeric' }))} · ${c ? c + ' зам.' : 'без замовлень'}"></i>`
+      : '<i class="out"></i>').join('')}</div>
+    <div class="axis"><span>${esc(label(from))}</span><span>Пн — Нд згори вниз</span><span>${esc(isoDay(to) === isoDay(new Date()) ? 'сьогодні' : label(to))}</span></div></div>`;
+}
+// the month picked on the timeline (custom range = exactly one calendar month), or ''
+const oneMonth = () => filt.range === 'custom' && /^\d{4}-\d{2}-01$/.test(filt.from) && filt.to === monthEnd(filt.from.slice(0, 7)) ? filt.from.slice(0, 7) : '';
 function openStats() { if (selected) { selected = null; redraw(false); } openSheet('stats'); renderStats(); }
+// keep the scroll position when a sheet re-renders itself (tab switch, filters); if the new content is
+// shorter, pad the bottom so the view does not jump up
+function holdScroll(kind) {
+  const sh = $('sheet'), b = sh.dataset.kind === kind ? sh.querySelector('.st-body') : null, keep = b ? b.scrollTop : 0;
+  // the sheet also keeps its height while you stay in it, so shorter content does not shrink it and reset the scroll
+  sh.style.minHeight = b ? sh.offsetHeight + 'px' : '';
+  return () => {
+    sh.dataset.kind = kind;
+    const nb = sh.querySelector('.st-body'); if (!keep || !nb) return;
+    // grow a spacer at the bottom until the old scroll position fits again
+    const pad = document.createElement('div'); nb.appendChild(pad);
+    for (let i = 0, h = 0; i < 4; i++) { const need = keep + nb.clientHeight - nb.scrollHeight; if (need <= 0) break; h += need; pad.style.height = h + 'px'; }
+    nb.scrollTop = keep;
+  };
+}
 function renderStats(playingMonth) {
+  const restore = holdScroll('stats');
   const vis = visibleEntries(), orders = vis.flatMap(e => e.orders);
   // summary
   const agg = moneyAgg(orders), avg = agg.n ? fmtMoney(agg.v / agg.n, agg.cur) : '—';
   const buyers = new Map(); orders.forEach(o => { const k = buyerKey(o); if (k) buyers.set(k, Math.max(buyers.get(k)||0, o.of||1)); });
   const repeatPct = buyers.size ? Math.round([...buyers.values()].filter(n => n > 1).length / buyers.size * 100) + '%' : (viewOnly && orders.some(o => o.of > 1) ? Math.round(orders.filter(o => o.of > 1).length / orders.length * 100) + '% зам.' : '—');
   const itemsSold = orders.reduce((s,o) => s + (o.itemsCount || itemsOf(o).length || 1), 0);
+  const shipD = orders.map(shipDays).filter(d => d != null), avgShip = shipD.length ? shipD.reduce((a,b) => a+b, 0) / shipD.length : null;
+  const discN = orders.filter(o => orderDiscount(o) > 0).length;
   let dSum = 0, dN = 0; vis.forEach(e => { if (!e.shop.origin) return; const d = distKm([e.shop.origin.lat, e.shop.origin.lng], [e.place.lat, e.place.lng]); dSum += d * e.orders.length; dN += e.orders.length; });
   // timeline (ignores the date filter, highlights months inside it)
   const allTime = visibleEntries(null), months = monthsOf(allTime), maxM = Math.max(1, ...months.map(m => m.n)), b = rangeBounds();
   const inRange = k => { if (playingMonth) return k <= playingMonth; if (!b) return true; const [y,m] = k.split('-').map(Number); const s = +new Date(y, m-1, 1), e = +new Date(y, m, 1); return s < b[1] && e > b[0]; };
-  const bars = months.map(m => `<div class="${inRange(m.k)?'in':''}" style="height:${Math.max(3, m.n/maxM*100)}%" data-k="${m.k}" title="${monthLabel(m.k)}: ${m.n} замовлень"></div>`).join('');
+  const bars = months.map(m => `<div class="${inRange(m.k)?'in':''}" style="height:${Math.max(3, m.n/maxM*100)}%" data-k="${m.k}" data-tip="${monthLabel(m.k)} · ${m.n} зам.${oneMonth() === m.k ? ' · клік — скинути' : ''}"></div>`).join('');
   // ranking lists
   const rank = rankHTML;
-  let rows = [], onPick = () => {}, note = '';
+  let rows = [], onPick = () => {}, note = '', extra = '', after = null;
   if (statsTab === 'cities') {
     const m = new Map(); vis.forEach(e => { const k = placeKey(e.place); if (!m.has(k)) m.set(k, { e, orders:[] }); m.get(k).orders.push(...e.orders); if (e.orders.length > m.get(k).e.orders.length) m.get(k).e = e; });
     const list = [...m.values()].sort((a,b) => b.orders.length - a.orders.length).slice(0, 30), mx = list[0]?.orders.length || 1;
@@ -1302,10 +1550,13 @@ function renderStats(playingMonth) {
     note = 'Скільки замовлень припадає на 1 млн жителів штату (перепис 2020). Вгорі — штати, де вас купують найактивніше відносно населення.';
     onPick = i => map.fitBounds(L.latLngBounds(list[i].pts).pad(.5), { maxZoom:7 });
   } else if (statsTab === 'buyers') {
-    const m = new Map(); vis.forEach(e => e.orders.forEach(o => { const k = buyerKey(o); if (!k || !(o.of > 1)) return; if (!m.has(k)) m.set(k, { name:o.buyer, of:o.of, orders:[], city:e.place.city }); m.get(k).orders.push(o); }));
-    const list = [...m.values()].sort((a,b) => b.of - a.of || b.orders.length - a.orders.length).slice(0, 30), mx = list[0]?.of || 1;
-    rows = list.map((x,i) => ({ name: privacy ? `Покупець #${i+1}` : esc(x.name), sub:esc(x.city||''), val:`${x.of}×`, rev:sumMoney(x.orders), share:x.of/mx }));
-    if (viewOnly) note = 'Імена покупців не передаються в посиланні для перегляду.';
+    const m = new Map(); vis.forEach(e => e.orders.forEach(o => { const k = buyerKey(o); if (!k || !(o.of > 1)) return; if (!m.has(k)) m.set(k, { name:o.buyer, of:o.of, orders:[], city:e.place.city, state:e.place.state, country:e.place.country, shop:e.shop.name, first:Infinity, last:0 }); const x = m.get(k); x.orders.push(o); const t = Date.parse(o.date); if (!isNaN(t)) { x.first = Math.min(x.first, t); x.last = Math.max(x.last, t); } }));
+    const list = [...m.values()].sort((a,b) => b.of - a.of || b.last - a.last).slice(0, 100), mx = list[0]?.of || 1;
+    rows = list.map((x,i) => ({ name: privacy ? `Покупець #${i+1}` : esc(x.name), sub:esc([x.city, x.last ? 'ост. ' + fmtDay(new Date(x.last)) : ''].filter(Boolean).join(' · ')), val:`${x.of}×`, rev:sumMoney(x.orders), share:x.of/mx }));
+    note = viewOnly ? 'Імена покупців не передаються в посиланні для перегляду.'
+      : list.length ? `${list.length} постійних клієнтів — купували більше одного разу. Натисніть, щоб знайти на мапі.` + (privacy ? '' : ' <button class="link" id="buyersCsv">⬇ Список у CSV</button>') : 'Поки що немає покупців з кількома замовленнями.';
+    after = () => { if ($('buyersCsv')) $('buyersCsv').onclick = () => downloadCSV(['Shop','Buyer','City','State','Country','Orders (all time)','Orders in period','Spent in period','First order','Last order'],
+      list.map(x => [x.shop, x.name, x.city, x.state, x.country, x.of, x.orders.length, sumMoney(x.orders), x.first < Infinity ? isoDay(new Date(x.first)) : '', x.last ? isoDay(new Date(x.last)) : '']), `etsy-repeat-buyers-${isoDay(new Date())}.csv`); };
     onPick = i => { if (privacy) return; filt.q = list[i].name; $('q').value = filt.q; closeSheet(); refresh(true); };
   } else if (statsTab === 'items') {
     const m = new Map(); vis.forEach(e => e.orders.forEach(o => itemsOf(o).forEach(it => { const k = itemKey(it); if (!k) return; if (!m.has(k)) m.set(k, { it, n:0, cities:new Set() }); m.get(k).n++; m.get(k).cities.add(placeKey(e.place)); })));
@@ -1313,6 +1564,15 @@ function renderStats(playingMonth) {
     rows = list.map(x => ({ name: listingLink(x.it), sub:`${x.cities.size} міст`, val:`${x.n}×`, share:x.n/mx, on: filt.item?.k === itemKey(x.it) }));
     note = list.length ? 'Натисніть на рядок, щоб показати на мапі лише покупців цього товару.' : (viewOnly ? 'Товари не передаються в посиланні для перегляду.' : 'Назви товарів є у файлі «Sold Order Items».');
     onPick = i => setItemFilter(filt.item?.k === itemKey(list[i].it) ? null : list[i].it);
+  } else if (statsTab === 'speed') {
+    const list = []; vis.forEach(e => e.orders.forEach(o => { const d = shipDays(o); if (d != null) list.push({ o, e, d }); }));
+    list.sort((a,b) => b.d - a.d);
+    const B = [['0–1 дн.', d => d <= 1], ['2–3 дн.', d => d >= 2 && d <= 3], ['4–7 дн.', d => d >= 4 && d <= 7], ['8+ дн.', d => d >= 8]];
+    if (list.length) extra = `<div class="st-grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:6px">${B.map(([l,f]) => { const n = list.filter(x => f(x.d)).length; return `<div class="m-stat"><b>${Math.round(n / list.length * 100)}%</b><span>${l}</span></div>`; }).join('')}</div><div class="m-h" style="padding-left:2px">Найдовше чекали відправки</div>`;
+    const top = list.slice(0, 30), mx = top[0]?.d || 1;
+    rows = top.map(x => ({ name: privacy || !x.o.buyer ? esc(x.e.place.city || '—') : esc(x.o.buyer), sub:esc([fmtDate(x.o.date), x.o.id ? '#' + x.o.id : ''].filter(Boolean).join(' · ')), val:`${x.d} дн.`, share:Math.max(.04, x.d / mx) }));
+    note = list.length ? 'Скільки днів минуло від продажу до відправки (колонка Date Shipped).' : (viewOnly ? 'Дати відправки не передаються в посиланні для перегляду.' : 'Немає дат відправки. Завантажте ще раз «Sold Orders» або «Sold Order Items» — тепер з них береться колонка Date Shipped.');
+    onPick = i => focusEntry(top[i].e);
   } else { // shipping by country
     const m = new Map(); vis.forEach(e => e.orders.forEach(o => { if (o.shipping == null) return; const k = e.place.country||'—'; if (!m.has(k)) m.set(k, { c:k, orders:[], shares:[] }); m.get(k).orders.push(o); const gross = o.itemLevel ? (o.total||0) + o.shipping : o.total; if (gross > 0) m.get(k).shares.push(o.shipping / gross); }));
     const list = [...m.values()].map(x => { const a = moneyAgg(x.orders, 'shipping'); return { ...x, avg: a.n ? a.v / a.n : 0, cur:a.cur, share: x.shares.length ? x.shares.reduce((s,v)=>s+v,0) / x.shares.length : 0 }; }).sort((a,b) => b.orders.length - a.orders.length), mx = Math.max(...list.map(x => x.share), .0001);
@@ -1320,7 +1580,8 @@ function renderStats(playingMonth) {
     note = list.length ? 'Середня вартість доставки й її частка в сумі замовлення.' : (viewOnly ? 'Дані про доставку не передаються в посиланні.' : 'Немає даних про доставку — завантажте файл «Sold Orders» (у ньому є колонка Shipping).');
     onPick = i => { filt.countries = new Set([list[i].c]); refresh(true); };
   }
-  const TABS = [['cities','Міста'],['countries','Країни'],['states','Штати США'],['buyers','Повторні'],['items','Товари'],['shipping','Доставка']];
+  const TABS = [['cities','Міста'],['countries','Країни'],['states','Штати США'],['buyers','Постійні клієнти'],['items','Товари'],['shipping','Доставка'],['speed','Час відправки']];
+  queueMicrotask(restore);
   $('sheet').innerHTML = `
     <div class="m-head"><div class="m-pin">📊</div>
       <div style="flex:1;min-width:0"><div class="m-title">Статистика</div><div class="m-sub">${esc(rangeLabel())} · ${shops.filter(s=>s.visible).length} магазин(и)${filt.item ? ' · '+esc(filt.item.t) : ''}</div></div>
@@ -1331,25 +1592,271 @@ function renderStats(playingMonth) {
         <div class="m-stat"><b>${repeatPct}</b><span>Повторні покупці</span></div>
         <div class="m-stat"><b>${itemsSold}</b><span>Товарів продано</span></div>
         <div class="m-stat"><b>${dN ? '~'+fmtKm(dSum/dN) : '—'}</b><span>${dN ? 'Сер. відстань' : 'Відстань: вкажіть місто ✎'}</span></div>
+        <div class="m-stat"><b>${avgShip == null ? '—' : avgShip.toFixed(1) + ' дн.'}</b><span>Сер. час відправки</span></div>
+        <div class="m-stat"><b>${orders.length ? Math.round(discN / orders.length * 100) + '%' : '—'}</b><span>Замовлень зі знижкою</span></div>
       </div>
       <div class="chart">
-        <div class="row"><span class="lbl" style="margin:0">Замовлення по місяцях</span><button class="link" id="playBtn">${playTimer ? '⏸ Зупинити' : '▶ Програти ріст'}</button></div>
-        ${months.length ? `<div class="bars" id="tlBars">${bars}</div><div class="axis"><span>${monthLabel(months[0].k)}</span><span>${playingMonth ? '<b style="color:var(--accent)">'+monthLabel(playingMonth)+'</b>' : ''}</span><span>${monthLabel(months[months.length-1].k)}</span></div>` : '<div class="empty">Немає дат замовлень</div>'}
+        <div class="row"><span class="lbl" style="margin:0">Замовлення по місяцях</span><button class="link" id="playBtn" style="white-space:nowrap">${playTimer ? '⏸ Пауза' : tl ? '▶ Продовжити' : '▶ Таймлапс на мапі'}</button></div>
+        ${months.length ? `<div class="bars" id="tlBars">${bars}</div><div class="axis"><span>${monthLabel(months[0].k)}</span><span>${playingMonth ? '<b style="color:var(--accent)">'+monthLabel(playingMonth)+'</b>' : filt.range !== 'all' && !tl ? `<button class="chip on" id="tlReset" style="font-size:11.5px;padding:1px 9px" title="Показати всі місяці">✕ ${esc(oneMonth() ? monthLabel(oneMonth()) : 'Скинути період')}</button>` : ''}</span><span>${monthLabel(months[months.length-1].k)}</span></div>` : '<div class="empty">Немає дат замовлень</div>'}
       </div>
       ${seasonHTML(allTime)}
+      ${calendarHTML(vis)}
       <div class="tabs">${TABS.map(([k,l]) => `<button data-t="${k}" class="${statsTab===k?'on':''}">${l}</button>`).join('')}</div>
       ${note ? `<div class="tab-note">${note}</div>` : ''}
+      ${extra}
       <div class="rk-list" id="rkList">${rank(rows)}</div>
     </div>`;
   $('mClose').onclick = closeSheet;
-  $('playBtn').onclick = () => playTimer ? stopPlay() : play();
+  $('playBtn').onclick = () => togglePlay();
   $('sheet').querySelectorAll('.tabs button').forEach(b => b.onclick = () => { statsTab = b.dataset.t; renderStats(); });
-  $('tlBars')?.addEventListener('click', ev => { const k = ev.target.dataset?.k; if (!k) return; stopPlay(); setRange('custom', k+'-01', monthEnd(k)); });
+  $('tlBars')?.addEventListener('click', ev => { const k = ev.target.dataset?.k; if (!k) return; stopPlay(); if (oneMonth() === k) setRange('all'); else setRange('custom', k+'-01', monthEnd(k)); });
+  if ($('tlReset')) $('tlReset').onclick = () => { stopPlay(false); setRange('all'); };
   $('rkList').onclick = ev => { if (ev.target.closest('a')) return; const r = ev.target.closest('.rk'); if (r) onPick(+r.dataset.i); };
+  $('calGrid')?.addEventListener('click', ev => { const d = ev.target.dataset?.d; if (!d) return; stopPlay(false); setRange('custom', d, d); });
+  after?.();
+}
+
+// ================= right sheet: money (goal, product costs, discounts, income tax) =================
+const jget = (k, d) => { try { return { ...d, ...JSON.parse(ls.get(k) || '{}') }; } catch { return { ...d }; } };
+let moneyTab = ['goal','margin','coupons','tax'].includes(ls.get('etsyMoneyTab')) ? ls.get('etsyMoneyTab') : 'goal';
+let goal = jget('etsyGoal', { period:'month', amount:0, cur:'' });
+let taxCfg = jget('etsyTax', { rate:5, base:'', year:new Date().getFullYear() });
+if (taxCfg.extra == null) taxCfg.extra = taxCfg.vz === false ? 0 : 1; // older setting: Ukrainian military levy on/off
+if (taxCfg.cur == null) taxCfg.cur = 'UAH';
+const PERIODS = [['month','Місяць'],['quarter','Квартал'],['year','Рік']], PER_LBL = { month:'місяць', quarter:'квартал', year:'рік' };
+function periodBounds(k, n = new Date()) {
+  const y = n.getFullYear(), m = n.getMonth();
+  if (k === 'year') return [+new Date(y, 0, 1), +new Date(y+1, 0, 1)];
+  if (k === 'quarter') { const q = Math.floor(m/3)*3; return [+new Date(y, q, 1), +new Date(y, q+3, 1)]; }
+  return [+new Date(y, m, 1), +new Date(y, m+1, 1)];
+}
+const periodName = (k, b) => { const d = new Date(b[0]); return k === 'year' ? String(d.getFullYear()) : k === 'quarter' ? `${Math.floor(d.getMonth()/3)+1} кв. ${d.getFullYear()}` : monthLabel(monthKey(b[0])); };
+const curSymbol = c => fmtMoney(0, c).replace(/[\d.,\s]/g, '') || c;
+const convTo = (v, from, to) => from === to ? v : rates?.[from] && rates?.[to] ? v / rates[from] * rates[to] : null;
+let ratesTry = null;
+const needRates = () => { if (!rates && !ratesTry) ratesTry = loadRates().then(ok => { if (ok) refresh(false); }); };
+const allOrders = () => shops.filter(s => s.visible).flatMap(s => s.places.flatMap(p => p.orders));
+const ordersIn = b => allOrders().filter(o => { const t = Date.parse(o.date); return !isNaN(t) && t >= b[0] && t < b[1]; });
+function sumIn(orders, cur) {
+  let v = 0, miss = 0;
+  orders.forEach(o => { if (o.total == null) return; const c = convTo(o.total, o.currency || 'USD', cur); if (c == null) { miss++; needRates(); } else v += c; });
+  return { v, miss };
+}
+const goalCur = () => goal.cur || dispCur || moneyAgg(allOrders()).cur || 'USD';
+// the goal ignores filters: all orders of visible shops in the current month / quarter / year
+function goalStatus() {
+  if (!(goal.amount > 0)) return null;
+  const b = periodBounds(goal.period), cur = goalCur(), s = sumIn(ordersIn(b), cur);
+  const f = Math.min(1, Math.max(0, (Date.now() - b[0]) / (b[1] - b[0])));
+  return { b, cur, ...s, pct: s.v / goal.amount, f, forecast: f > .04 ? s.v / f : null, left: Math.max(0, goal.amount - s.v), daysLeft: Math.max(1, Math.ceil((b[1] - Date.now()) / 864e5)) };
+}
+function updateGoalBar() {
+  const g = viewOnly ? null : goalStatus(), el = $('gRev');
+  el.classList.toggle('show', !!g);
+  if (!g) return el.removeAttribute('title');
+  el.firstChild.style.width = Math.min(100, g.pct * 100) + '%';
+  el.title = `Натисніть, щоб відкрити ціль. Ціль на ${PER_LBL[goal.period]}: ${fmtMoney(g.v, g.cur)} з ${fmtMoney(goal.amount, g.cur)} (${Math.round(g.pct * 100)}%)`;
+}
+
+function openMoney() { if (selected) { selected = null; redraw(false); } openSheet('money'); renderMoney(); }
+function renderMoney() {
+  const TABS = [['goal','🎯 Ціль'],['margin','📦 Собівартість'],['coupons','🏷 Знижки'],['tax','🧾 Податок']];
+  const SUB = { goal:'Прогрес і прогноз доходу', margin:rangeLabel() + ' · прибуток по товарах', coupons:rangeLabel() + ' · купони й розпродажі', tax:'Податок з доходу за вашою ставкою' };
+  const [body, after] = moneyTab === 'goal' ? goalHTML() : moneyTab === 'margin' ? marginHTML() : moneyTab === 'coupons' ? couponsHTML() : taxHTML();
+  const restore = holdScroll('money');
+  $('sheet').innerHTML = `
+    <div class="m-head"><div class="m-pin">💰</div>
+      <div style="flex:1;min-width:0"><div class="m-title">Гроші</div><div class="m-sub">${esc(SUB[moneyTab])}</div></div>
+      <button class="ib" id="mClose" title="Закрити (Esc)">✕</button></div>
+    <div class="st-body" id="mnBody"><div class="tabs" style="margin-top:0">${TABS.map(([k,l]) => `<button data-t="${k}" class="${moneyTab===k?'on':''}">${l}</button>`).join('')}</div>${body}</div>`;
+  restore();
+  $('mClose').onclick = closeSheet;
+  $('sheet').querySelectorAll('.tabs button').forEach(b => b.onclick = () => { moneyTab = b.dataset.t; ls.set('etsyMoneyTab', moneyTab); renderMoney(); syncTopButtons(); });
+  after?.();
+}
+
+// ---- goal ----
+function goalHTML() {
+  const cur = goalCur(), g = goalStatus();
+  let html = `<div class="lbl">Ціль доходу</div>
+    <div class="gform"><div class="chips">${PERIODS.map(([k,l]) => `<button class="chip${goal.period===k?' on':''}" data-p="${k}">${l}</button>`).join('')}</div>
+      <label class="money-in"><span>${esc(curSymbol(cur))}</span><input type="number" id="goalAmt" min="0" step="50" inputmode="decimal" placeholder="Напр. 2000" value="${goal.amount > 0 ? goal.amount : ''}"></label></div>`;
+  if (!g) html += '<div class="empty">Вкажіть суму — і тут з\'явиться прогрес, прогноз до кінця періоду та скільки треба продавати щодня. Під плиткою «Дохід» теж буде смужка прогресу.</div>';
+  else {
+    const ahead = g.v >= goal.amount * g.f;
+    html += `<div class="goal-big"><b>${esc(fmtMoney(g.v, cur))}</b><span>з ${esc(fmtMoney(goal.amount, cur))} · ${Math.round(g.pct * 100)}%</span></div>
+      <div class="prog"><i style="width:${Math.min(100, g.pct * 100)}%"></i><em style="left:${g.f * 100}%" title="Сьогодні: минуло ${Math.round(g.f * 100)}% періоду"></em></div>
+      <div class="hint" style="margin:7px 0 12px">${esc(periodName(goal.period, g.b))} · минуло ${Math.round(g.f * 100)}% періоду (риска на смужці)${g.miss ? ` · ${g.miss} зам. в іншій валюті без курсу` : ''}</div>
+      <div class="st-grid">
+        <div class="m-stat"><b class="${g.forecast == null ? '' : g.forecast >= goal.amount ? 'pos' : 'neg'}">${g.forecast == null ? '—' : esc(fmtMoney(g.forecast, cur))}</b><span>Прогноз на кінець</span></div>
+        <div class="m-stat"><b>${g.left ? esc(fmtMoney(g.left / g.daysLeft, cur)) : '✓'}</b><span>${g.left ? `Треба на день · ще ${g.daysLeft} дн.` : 'Ціль досягнута'}</span></div>
+      </div>
+      <div class="tab-note" style="padding:10px 2px 0">${g.pct >= 1 ? '🎉 Ціль уже виконана!' : ahead ? '✅ Йдете з випередженням графіка.' : '⚠️ Поки що відстаєте від графіка.'} Прогноз рахується так, ніби продажі й далі йтимуть тим самим темпом. Фільтри не враховуються — лише видимі магазини.</div>`;
+    const hist = [];
+    for (let i = 1; i <= 6; i++) {
+      const n = new Date(), d = goal.period === 'year' ? new Date(n.getFullYear() - i, 6, 1) : new Date(n.getFullYear(), n.getMonth() - (goal.period === 'quarter' ? 3 : 1) * i, 15);
+      const b = periodBounds(goal.period, d), x = sumIn(ordersIn(b), cur); if (x.v > 0) hist.push({ b, v:x.v });
+    }
+    if (hist.length) {
+      const mx = Math.max(goal.amount, ...hist.map(h => h.v));
+      html += `<div class="lbl">Попередні періоди проти цієї цілі</div><div class="rk-list">` + rankHTML(hist.map(h => ({ name:esc(periodName(goal.period, h.b)), val:esc(fmtMoney(h.v, cur)), rev:Math.round(h.v / goal.amount * 100) + '%', share:h.v / mx, on:h.v >= goal.amount }))) + '</div>';
+    }
+  }
+  return [html, () => {
+    const save = () => { ls.set('etsyGoal', JSON.stringify(goal)); renderMoney(); updateGoalBar(); syncTopButtons(); };
+    $('sheet').querySelectorAll('[data-p]').forEach(b => b.onclick = () => { goal.period = b.dataset.p; save(); });
+    $('goalAmt').onchange = e => { goal.amount = Math.max(0, parseFloat(e.target.value) || 0); goal.cur = goal.amount ? cur : ''; save(); };
+  }];
+}
+
+// ---- cost of goods & margin per listing ----
+function itemStats(entries) {
+  const m = new Map();
+  entries.forEach(e => e.orders.forEach(o => itemsOf(o).forEach(it => {
+    const k = itemKey(it); if (!k) return;
+    const key = e.shop.id + '|' + k, lp = linePaid(it, o), oc = o.currency || 'USD';
+    if (!m.has(key)) m.set(key, { shop:e.shop, it, k, units:0, rev:0, cur:oc, miss:0 });
+    const x = m.get(key); x.units += it.q || 1;
+    const v = lp.paid == null ? null : convTo(lp.paid, oc, x.cur);
+    if (v == null) x.miss++; else x.rev += v;
+  })));
+  return [...m.values()].sort((a,b) => b.rev - a.rev || b.units - a.units);
+}
+function marginHTML() {
+  const list = itemStats(visibleEntries()).slice(0, 150);
+  if (!list.length) return ['<div class="empty">Тут з\'являться товари з файлу «Sold Order Items». Для кожного вкажете собівартість однієї штуки — і побачите реальний прибуток і маржу.</div>'];
+  const many = shops.filter(s => s.visible).length > 1;
+  const res = x => { const c = unitCost(x.shop, x.it); if (c == null) return '<span class="muted">—</span>'; const pr = x.rev - c * x.units, mg = x.rev ? pr / x.rev : 0; return `<b class="${pr >= 0 ? 'pos' : 'neg'}">${pr >= 0 ? '+' : ''}${esc(fmtMoney(pr, x.cur))}</b><small>маржа ${Math.round(mg * 100)}%</small>`; };
+  const sum = () => {
+    const w = list.filter(x => unitCost(x.shop, x.it) != null);
+    const rev = moneyAgg(w.map(x => ({ currency:x.cur, v:x.rev })), 'v'), cg = moneyAgg(w.map(x => ({ currency:x.cur, v:unitCost(x.shop, x.it) * x.units })), 'v'), pr = moneyAgg(w.map(x => ({ currency:x.cur, v:x.rev - unitCost(x.shop, x.it) * x.units })), 'v');
+    return `<div class="st-grid">
+      <div class="m-stat"><b>${esc(fmtAgg(rev))}</b><span>Дохід з цих товарів</span></div>
+      <div class="m-stat"><b class="${cg.n ? 'neg' : ''}">${cg.n ? '-' : ''}${esc(fmtAgg(cg))}</b><span>Собівартість</span></div>
+      <div class="m-stat"><b class="${pr.n ? (pr.v >= 0 ? 'pos' : 'neg') : ''}">${pr.n && pr.v > 0 ? '+' : ''}${esc(fmtAgg(pr))}</b><span>Валовий прибуток</span></div>
+      <div class="m-stat"><b>${rev.n && rev.v ? Math.round(pr.v / rev.v * 100) + '%' : '—'}</b><span>Маржа · ${w.length} з ${list.length} тов.</span></div></div>`;
+  };
+  const rows = list.map((x, i) => `<div class="mg"><div class="mid"><div class="tt">${listingLink(x.it)}</div>
+      <div class="mm">${many ? `<span class="sn">${esc(x.shop.name)}</span> · ` : ''}${x.units} шт. · ${esc(fmtMoney(x.rev, x.cur))}${x.miss ? ` · ${x.miss} без ціни` : ''}</div></div>
+      <label class="money-in sm" title="Собівартість 1 шт."><span>${esc(curSymbol(x.cur))}</span><input type="number" min="0" step="0.01" inputmode="decimal" data-i="${i}" placeholder="за 1 шт." value="${unitCost(x.shop, x.it) ?? ''}"></label>
+      <div class="mg-r" id="mgR${i}">${res(x)}</div></div>`).join('');
+  return [`<div class="tab-note" style="padding:0 2px 10px">Вкажіть, скільки вам коштує <b>1 штука</b> товару: матеріали, друк, пакування. Дохід — це ціна, яку заплатив покупець, уже зі знижкою. Собівартість також додається до плиток «Витрати» й «Чистий прибуток».</div>
+    <div id="mgSum">${sum()}</div><div class="lbl">Товари · ${esc(rangeLabel())}</div>${rows}`, () => {
+    $('sheet').querySelectorAll('.mg input').forEach(inp => inp.onchange = () => {
+      const x = list[+inp.dataset.i], raw = inp.value.trim(), v = raw === '' ? null : parseFloat(raw);
+      x.shop.costs ||= {};
+      if (v == null || isNaN(v) || v < 0) delete x.shop.costs[x.k]; else x.shop.costs[x.k] = Math.round(v * 100) / 100;
+      // the same listing may appear in several rows only across shops; refresh every row of this shop+listing
+      list.forEach((y, j) => { if (y.shop === x.shop && y.k === x.k) $('mgR' + j).innerHTML = res(y); });
+      saveShops(); $('mgSum').innerHTML = sum(); if (!viewOnly) updateFinanceKPIs(compareBounds());
+    });
+  }];
+}
+
+// ---- discounts & coupons ----
+function couponsHTML() {
+  const orders = visibleEntries().flatMap(e => e.orders);
+  if (!orders.length) return ['<div class="empty">Немає замовлень для цих фільтрів</div>'];
+  const known = orders.some(o => o.discount != null || o.coupon || itemsOf(o).some(it => it.d != null));
+  const withD = orders.filter(o => orderDiscount(o) > 0 || o.coupon), noD = orders.filter(o => !(orderDiscount(o) > 0 || o.coupon));
+  const dAgg = moneyAgg(withD.map(o => ({ currency:o.currency || 'USD', v:orderDiscount(o) })), 'v');
+  const gross = moneyAgg(withD.map(o => ({ currency:o.currency || 'USD', v:(o.total || 0) + orderDiscount(o) })), 'v');
+  const avg = list => { const a = moneyAgg(list); return a.n ? fmtMoney(a.v / a.n, a.cur) : '—'; };
+  let html = `<div class="st-grid">
+    <div class="m-stat"><b>${withD.length} · ${Math.round(withD.length / orders.length * 100)}%</b><span>Замовлень зі знижкою</span></div>
+    <div class="m-stat"><b class="${dAgg.n && dAgg.v > 0 ? 'neg' : ''}">${dAgg.n && dAgg.v > 0 ? '-' : ''}${esc(fmtAgg(dAgg))}</b><span>Віддано на знижках</span></div>
+    <div class="m-stat"><b>${esc(avg(withD))}</b><span>Чек зі знижкою</span></div>
+    <div class="m-stat"><b>${esc(avg(noD))}</b><span>Чек без знижки</span></div></div>`;
+  if (gross.n && gross.v > 0 && dAgg.cur === gross.cur) html += `<div class="hint" style="margin:8px 2px 0">Середня знижка — ${Math.round(dAgg.v / gross.v * 100)}% від ціни.</div>`;
+  const m = new Map();
+  withD.forEach(o => { const k = o.coupon || ''; if (!m.has(k)) m.set(k, { code:k, info:o.couponInfo || '', orders:[] }); const x = m.get(k); x.orders.push(o); if (!x.info && o.couponInfo) x.info = o.couponInfo; });
+  const list = [...m.values()].map(x => ({ ...x, d:moneyAgg(x.orders.map(o => ({ currency:o.currency || 'USD', v:orderDiscount(o) })), 'v') })).sort((a,b) => b.orders.length - a.orders.length), mx = list[0]?.orders.length || 1;
+  html += `<div class="lbl">Купони й розпродажі</div><div class="rk-list">` + rankHTML(list.map(x => ({ name:esc(x.code || 'Розпродаж / без коду'), sub:esc(x.info), val:`${x.orders.length} зам.`, rev:(x.d.n && x.d.v ? '-' + fmtMoney(x.d.v, x.d.cur) + ' · ' : '') + sumMoney(x.orders), share:x.orders.length / mx }))) + '</div>';
+  html += `<div class="tab-note" style="padding:10px 2px 0">${known ? 'Окупність: порівняйте, скільки замовлень і доходу дав купон, із сумою, яку ви на ньому втратили.' : 'Немає даних про знижки. Завантажте «Sold Orders» (колонки Coupon Code, Discount Amount) — можна разом з іншими файлами.'}</div>`;
+  return [html];
+}
+
+// ---- income tax: your own rate(s), any currency (converted at the NBU rate of each day, via UAH) ----
+let nbu = null, nbuBusy = false; const nbuTried = new Set();
+const nbuKey = t => { const d = new Date(t); return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`; };
+const nbuRate = (cur, t) => cur === 'UAH' ? 1 : nbu?.[nbuKey(t)]?.[cur] ?? null;
+async function nbuLoad(keys, onStep) { // one request per day returns every currency of that day
+  const todo = [...new Set(keys)]; let done = 0;
+  const worker = async () => { while (todo.length) { const k = todo.shift(); nbuTried.add(k);
+    try { const j = await (await fetch(`https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?date=${k}&json`)).json(); if (Array.isArray(j) && j.length) nbu[k] = Object.fromEntries(j.map(x => [x.cc, x.rate])); } catch {}
+    onStep?.(++done); } };
+  await Promise.all([1,2,3,4].map(worker));
+  kv.set('nbu', nbu);
+}
+const hasDeposits = () => shops.some(s => s.visible && s.ledger?.some(r => r.cat === 'deposit'));
+function taxRecords(base, year) {
+  const y0 = +new Date(year, 0, 1), y1 = +new Date(year + 1, 0, 1), vs = shops.filter(s => s.visible);
+  const recs = base === 'deposits'
+    ? vs.flatMap(s => (s.ledger || []).filter(r => r.cat === 'deposit').map(r => ({ t:Date.parse(r.date), v:Math.abs(r.net), cur:r.currency || 'USD', src:'Виплата Etsy на рахунок', shop:s.name })))
+    : vs.flatMap(s => s.places.flatMap(p => p.orders.filter(o => o.total != null).map(o => ({ t:Date.parse(o.date), v:o.total, cur:o.currency || 'USD', src:'Замовлення' + (o.id ? ' #' + o.id : ''), shop:s.name }))));
+  return recs.filter(r => r.t >= y0 && r.t < y1).sort((a,b) => a.t - b.t);
+}
+function taxHTML() {
+  if (nbu == null) { kv.get('nbu').then(v => { nbu = v || {}; if (sheet === 'money' && moneyTab === 'tax') renderMoney(); }); return ['<div class="empty">Завантаження…</div>']; }
+  const deps = hasDeposits(), base = taxCfg.base === 'orders' || !deps ? 'orders' : 'deposits';
+  const years = new Set([new Date().getFullYear()]);
+  allOrders().forEach(o => { const t = Date.parse(o.date); if (!isNaN(t)) years.add(new Date(t).getFullYear()); });
+  const recs = taxRecords(base, taxCfg.year), today = nbuKey(Date.now());
+  // report currency: the one chosen, or the most common one in the records
+  const cnt = {}; recs.forEach(r => cnt[r.cur] = (cnt[r.cur] || 0) + 1);
+  const rc = taxCfg.cur || Object.entries(cnt).sort((a,b) => b[1] - a[1])[0]?.[0] || 'USD';
+  const fx = (cur, t) => { if (cur === rc) return 1; const a = nbuRate(cur, t), b = nbuRate(rc, t); return a != null && b ? a / b : null; };
+  const missing = recs.filter(r => fx(r.cur, r.t) == null).map(r => nbuKey(r.t)).filter(k => k <= today && !nbuTried.has(k));
+  if (missing.length && !nbuBusy) {
+    nbuBusy = true; const total = new Set(missing).size;
+    nbuLoad(missing, d => { const el = $('taxProg'); if (el) el.textContent = `Завантажую курси НБУ… ${d} з ${total}`; })
+      .finally(() => { nbuBusy = false; if (sheet === 'money' && moneyTab === 'tax') renderMoney(); });
+  }
+  const rate = +taxCfg.rate || 0, extra = +taxCfg.extra || 0, Q = [0,1,2,3].map(() => ({ inc:0, n:0 }));
+  let miss = 0, conv = 0;
+  recs.forEach(r => { const k = fx(r.cur, r.t); if (k == null) { miss++; return; } if (r.cur !== rc) conv++; const q = Q[Math.floor(new Date(r.t).getMonth() / 3)]; q.inc += r.v * k; q.n++; });
+  const U = v => fmtMoney(v, rc), tot = Q.reduce((s, q) => s + q.inc, 0), taxOf = v => v * (rate + extra) / 100;
+  const fop = rate === 5 && extra === 1 && taxCfg.cur === 'UAH';
+  let html = `<div class="cfg" style="margin-bottom:10px">
+      <div class="chips">${[...years].sort((a,b) => b - a).map(y => `<button class="chip${taxCfg.year === y ? ' on' : ''}" data-y="${y}">${y}</button>`).join('')}</div></div>
+    <div class="lbl" style="margin-top:4px">Ставка</div>
+    <div class="cfg">
+      <label>Податок <span class="money-in sm"><input type="number" id="taxRate" min="0" max="60" step="0.5" value="${rate}"><span>%</span></span></label>
+      <label title="Наприклад, військовий збір, соціальний внесок або місцевий податок">+ збір <span class="money-in sm"><input type="number" id="taxExtra" min="0" max="60" step="0.5" value="${extra}"><span>%</span></span></label>
+      <button class="chip${fop ? ' on' : ''}" id="taxFop" title="5% єдиний податок + 1% військовий збір, у гривнях">🇺🇦 ФОП 3 група</button></div>
+    <div class="lbl">Валюта звіту</div>
+    <div class="chips">${CURS.map(([c,l]) => `<button class="chip${taxCfg.cur === c ? ' on' : ''}" data-c="${c}">${l}</button>`).join('')}</div>
+    <div class="lbl">Що вважати доходом</div>
+    <div class="chips"><button class="chip${base === 'deposits' ? ' on' : ''}" data-b="deposits"${deps ? '' : ' disabled style="opacity:.45;cursor:default"'}>Виплати Etsy на рахунок</button><button class="chip${base === 'orders' ? ' on' : ''}" data-b="orders">Суми замовлень</button></div>
+    ${deps ? '' : '<div class="hint" style="margin-top:6px">Щоб рахувати з виплат, завантажте ще раз щомісячні виписки Etsy — тепер з них беруться й рядки Deposit.</div>'}
+    <div class="goal-big" style="margin-top:16px"><b>${esc(U(taxOf(tot)))}</b><span>до сплати за ${taxCfg.year} · з доходу ${esc(U(tot))}</span></div>
+    <div class="hint" id="taxProg" style="margin-top:4px">${nbuBusy ? 'Завантажую курси НБУ…' : miss ? `⚠️ ${miss} надходж. без курсу (майбутня дата або немає інтернету) — не враховані.` : `${recs.length} надходжень${conv ? `, ${conv} з них перераховано за курсом НБУ на свою дату` : ''}.`}</div>
+    <div class="tax-wrap"><table class="tax"><tr><th>Квартал</th><th>Дохід</th><th>Податок ${rate}%</th>${extra ? `<th>Збір ${extra}%</th>` : ''}<th>Разом</th></tr>
+      ${Q.map((q, i) => `<tr><td>${i + 1} кв.<small class="muted"> · ${q.n}</small></td><td>${esc(U(q.inc))}</td><td>${esc(U(q.inc * rate / 100))}</td>${extra ? `<td>${esc(U(q.inc * extra / 100))}</td>` : ''}<td><b>${esc(U(taxOf(q.inc)))}</b></td></tr>`).join('')}
+      <tr class="tot"><td>Рік</td><td>${esc(U(tot))}</td><td>${esc(U(tot * rate / 100))}</td>${extra ? `<td>${esc(U(tot * extra / 100))}</td>` : ''}<td>${esc(U(taxOf(tot)))}</td></tr></table></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="taxCsv">⬇ CSV для бухгалтера</button></div>
+    <div class="tab-note" style="padding:12px 2px 0">Податок рахується з доходу за вашою ставкою, по кварталах. Що саме вважається доходом, залежить від вашої системи оподаткування — найчастіше це гроші, що надійшли на рахунок (виплати Etsy, рядки Deposit у виписці). Суми в інших валютах перераховуються за курсом НБУ на дату кожного надходження. Фіксовані внески (наприклад, ЄСВ) тут не враховано. Це оцінка — звірте з бухгалтером.</div>`;
+  return [html, () => {
+    const save = () => { ls.set('etsyTax', JSON.stringify(taxCfg)); renderMoney(); };
+    $('sheet').querySelectorAll('[data-y]').forEach(b => b.onclick = () => { taxCfg.year = +b.dataset.y; save(); });
+    $('sheet').querySelectorAll('[data-b]').forEach(b => b.onclick = () => { if (b.disabled) return; taxCfg.base = b.dataset.b; save(); });
+    $('sheet').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { taxCfg.cur = b.dataset.c; save(); });
+    $('taxRate').onchange = e => { taxCfg.rate = Math.max(0, Math.min(60, parseFloat(e.target.value) || 0)); save(); };
+    $('taxExtra').onchange = e => { taxCfg.extra = Math.max(0, Math.min(60, parseFloat(e.target.value) || 0)); save(); };
+    $('taxFop').onclick = () => { Object.assign(taxCfg, { rate:5, extra:1, cur:'UAH' }); save(); };
+    $('taxCsv').onclick = () => downloadCSV(['Date','Source','Shop','Amount','Currency','Rate (NBU)',`Amount ${rc}`,'Quarter'],
+      recs.map(r => { const k = fx(r.cur, r.t); return [isoDay(new Date(r.t)), r.src, r.shop, r.v.toFixed(2), r.cur, k != null && r.cur !== rc ? +k.toFixed(6) : '', k != null ? (r.v * k).toFixed(2) : '', Math.floor(new Date(r.t).getMonth() / 3) + 1]; }),
+      `tax-income-${taxCfg.year}-${rc}.csv`);
+  }];
 }
 
 // ================= export =================
 function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
+const csvCell = v => { let s = String(v ?? ''); if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+function downloadCSV(head, rows, name) {
+  download(new Blob(['\ufeff' + [head, ...rows].map(r => r.map(csvCell).join(',')).join('\n')], { type:'text/csv;charset=utf-8' }), name);
+  toast(`Експортовано ${rows.length} рядків.`, 3000);
+}
 function exportCSV() {
   const vis = visibleEntries(); if (!vis.length) return toast('Немає замовлень для експорту.', 3000);
   const head = ['Shop','Order ID','Date','Buyer','City','State','Country','Items','Listing IDs','Quantity','Total','Shipping','Currency','Repeat'];
@@ -1534,6 +2041,35 @@ document.body.ondragover = e => { e.preventDefault(); if (!viewOnly) document.bo
 document.body.ondragleave = e => { if (!e.relatedTarget) document.body.classList.remove('drop'); };
 document.body.ondrop = e => { e.preventDefault(); document.body.classList.remove('drop'); loadFiles(e.dataTransfer.files); };
 $('clear').onclick = () => { cache = {}; kv.set('geo', cache); toast('Кеш геокодингу очищено.', 2000); };
+
+// ================= instant tooltips: any element with data-tip =================
+const tipEl = document.createElement('div'); tipEl.id = 'tip'; document.body.appendChild(tipEl);
+const hideTip = () => tipEl.classList.remove('show');
+document.addEventListener('mouseover', e => {
+  const t = e.target.closest?.('[data-tip]'); if (!t) return hideTip();
+  tipEl.textContent = t.dataset.tip; tipEl.classList.add('show');
+  const r = t.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  tipEl.style.left = Math.max(6, Math.min(innerWidth - w - 6, r.left + r.width / 2 - w / 2)) + 'px';
+  tipEl.style.top = (r.top - h - 6 < 6 ? r.bottom + 6 : r.top - h - 6) + 'px';
+});
+document.addEventListener('scroll', hideTip, true);
+document.addEventListener('mouseleave', hideTip);
+document.addEventListener('click', e => { if (!e.target.closest?.('[data-tip]')) hideTip(); });
+
+// ================= install as an app (PWA) =================
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+async function installApp() {
+  if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) return toast('Карта вже відкрита як застосунок 👍', 3000);
+  if (installEvt) { installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); installEvt = null; if (r?.outcome === 'accepted') toast('Готово! Іконка з\'явиться серед застосунків.', 4000); return; }
+  const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const safari = /Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua);
+  toast(ios ? 'iPhone/iPad: Safari → кнопка «Поділитися» ⬆ → «На початковий екран».'
+    : safari ? 'Mac: у Safari меню «Файл» → «Додати в Dock».'
+    : /Firefox/.test(ua) ? 'Firefox не вміє встановлювати сайти як застосунки — відкрийте сторінку в Chrome, Edge чи Safari.'
+    : 'Chrome/Edge: значок встановлення праворуч в адресному рядку, або меню ⋮ → «Трансляція, збереження й поширення» → «Встановити сторінку як застосунок».', 9000);
+}
 
 // ================= boot =================
 (async function boot() {

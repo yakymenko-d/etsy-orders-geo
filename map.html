@@ -1,0 +1,2107 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Карта замовлень Etsy</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff9a3c'/%3E%3Cstop offset='1' stop-color='%23f1641e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M32 53s15-13.2 15-24.5a15 15 0 0 0-30 0C17 39.8 32 53 32 53z' fill='%23fff'/%3E%3Ccircle cx='32' cy='28.5' r='6' fill='%23f1641e'/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#f1641e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Карта Etsy">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+<style>
+  :root {
+    --glass:rgba(255,255,255,.84); --solid:#fff; --fg:#1c1b1a; --muted:#6b6560; --line:rgba(0,0,0,.09); --hover:rgba(0,0,0,.05);
+    --accent:#f1641e; --accent2:#ff9a3c; --accent-soft:rgba(241,100,30,.13); --danger:#e5484d; --good:#1a9850;
+    --shadow:0 8px 30px rgba(20,16,12,.16), 0 1px 3px rgba(20,16,12,.1);
+    --r:18px; --mapbg:#e8e4de;
+  }
+  :root[data-theme="dark"] {
+    --glass:rgba(34,32,31,.82); --solid:#262423; --fg:#f4efe9; --muted:#a49c94; --line:rgba(255,255,255,.1); --hover:rgba(255,255,255,.07);
+    --accent-soft:rgba(255,128,60,.2); --good:#4cc38a; --danger:#ff6b6f;
+    --shadow:0 10px 36px rgba(0,0,0,.55), 0 1px 3px rgba(0,0,0,.4); --mapbg:#1b1b1d;
+    color-scheme:dark;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--mapbg); font:14px/1.45 ui-sans-serif,-apple-system,"SF Pro Text","Segoe UI",Roboto,Inter,sans-serif; color:var(--fg); -webkit-font-smoothing:antialiased; overflow:hidden; }
+  #map { position:absolute; inset:0; background:var(--mapbg); }
+  .leaflet-tooltip { background:var(--solid); color:var(--fg); border-color:var(--line); box-shadow:var(--shadow); }
+  .leaflet-tooltip-top:before { border-top-color:var(--solid); }
+  .leaflet-tooltip-bottom:before { border-bottom-color:var(--solid); }
+  .leaflet-tooltip-left:before { border-left-color:var(--solid); }
+  .leaflet-tooltip-right:before { border-right-color:var(--solid); }
+  .glass { background:var(--glass); backdrop-filter:blur(18px) saturate(1.5); -webkit-backdrop-filter:blur(18px) saturate(1.5); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); }
+  button { font:inherit; color:inherit; }
+  .ib { border:0; background:transparent; width:32px; height:32px; border-radius:10px; cursor:pointer; display:grid; place-items:center; color:var(--muted); font-size:15px; flex:none; transition:background .15s, color .15s; }
+  .ib:hover { background:var(--hover); color:var(--fg); }
+  .ib.off { opacity:.4; }
+  .ib.on { background:var(--accent-soft); color:var(--accent); }
+
+  /* ---------- left column ---------- */
+  #left { position:absolute; top:14px; left:14px; z-index:1000; width:min(372px, calc(100vw - 28px)); max-height:calc(100% - 150px); display:flex; flex-direction:column; gap:10px; pointer-events:none; }
+  #left > * { pointer-events:auto; }
+  #shopsCard { padding:10px 8px 8px; flex:none; }
+  .sh-head { display:flex; align-items:center; padding:2px 4px 6px 8px; gap:8px; }
+  #collapseShops svg { transition:transform .2s; }
+  #shopsCard.collapsed #collapseShops svg { transform:rotate(180deg); }
+  #shopsCard.collapsed #shopList, #shopsCard.collapsed #addShop { display:none; }
+  #shopsCard.collapsed .sh-head { padding-bottom:2px; }
+  #miniShops { display:none; align-items:center; }
+  #shopsCard.collapsed #miniShops { display:flex; }
+  #miniShops .av { width:24px; height:24px; border-radius:8px; font-size:12px; box-shadow:none; border:2px solid var(--solid); margin-left:-7px; }
+  #miniShops .av:first-child { margin-left:0; }
+  #miniShops .av.off { opacity:.35; }
+  /* blur shop names and logos, e.g. for screenshots */
+  body.blurnames .shop .n, body.blurnames .shop .av, body.blurnames #miniShops .av, body.blurnames .m-shop { filter:blur(6px); user-select:none; }
+  .sh-head b { font-size:15px; letter-spacing:-.01em; }
+  #viewerLink { display:none; font-size:13px; font-weight:600; color:var(--accent); text-decoration:none; white-space:nowrap; }
+  #shopList { max-height:236px; overflow:auto; display:flex; flex-direction:column; gap:2px; }
+  .shop { display:flex; align-items:center; gap:10px; padding:7px 6px 7px 8px; border-radius:13px; cursor:pointer; border:1.5px solid transparent; }
+  .shop:hover { background:var(--hover); }
+  .shop.active { border-color:var(--c); background:color-mix(in srgb, var(--c) 10%, transparent); }
+  .av { width:38px; height:38px; border-radius:12px; flex:none; object-fit:cover; background:var(--c); color:#fff; display:grid; place-items:center; font-weight:800; font-size:18px; box-shadow:0 3px 10px color-mix(in srgb, var(--c) 45%, transparent); }
+  .shop .t { flex:1; min-width:0; }
+  .shop .n { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.01em; }
+  .shop .s { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .shop .dotc { width:9px; height:9px; border-radius:50%; background:var(--c); display:inline-block; margin-right:5px; }
+  .shop .acts { display:flex; gap:0; flex:none; }
+  .shop .acts .ib { width:30px; height:30px; }
+  .shop .acts .ib:hover { color:var(--c); }
+
+  #kpis { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; flex:none; }
+  .neg { color:var(--danger) !important; }
+  .pos { color:var(--good) !important; }
+  .kpi { padding:10px 6px; text-align:center; border-radius:14px; min-width:0; cursor:pointer; transition:transform .15s, border-color .15s; display:flex; flex-direction:column; justify-content:center; }
+  .kpi:hover { transform:translateY(-1px); border-color:var(--accent); }
+  .kpi.on { border-color:var(--accent); box-shadow:0 0 0 1.5px var(--accent), var(--shadow); }
+  .kpi b { display:block; font-size:17px; letter-spacing:-.02em; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .kpi span { display:block; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .kpi i { display:none; font-style:normal; font-size:11px; font-weight:700; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .kpi i.show { display:block; }
+  .kpi i.up { color:var(--good); } .kpi i.down { color:var(--danger); } .kpi i.flat { color:var(--muted); }
+
+  #search { display:flex; align-items:center; gap:8px; padding:6px 6px 6px 14px; flex:none; }
+  #search input { flex:1; min-width:0; border:0; outline:0; background:transparent; color:var(--fg); font-size:15px; padding:8px 0; }
+  #search input::placeholder { color:var(--muted); }
+  #toggleFilters { position:relative; }
+  #toggleFilters.active::after { content:""; position:absolute; top:5px; right:5px; width:9px; height:9px; border-radius:50%; background:var(--accent); border:2px solid var(--solid); }
+  #filtersCard { padding:14px; overflow:auto; display:none; min-height:0; }
+  #filtersCard.open { display:block; }
+  #customRange input { flex:1; min-width:0; padding:7px 9px; border-radius:10px; border:1px solid var(--line); background:transparent; color:var(--fg); font:inherit; font-size:13px; }
+  .lbl { font-size:11px; color:var(--muted); margin:14px 0 8px; text-transform:uppercase; letter-spacing:.07em; font-weight:600; }
+  .lbl:first-child { margin-top:0; }
+  .hint { font-size:12px; color:var(--muted); }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { border:1px solid var(--line); background:transparent; padding:5px 12px; border-radius:99px; cursor:pointer; font-size:13px; transition:all .15s; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip:hover { background:var(--hover); }
+  .chip.on { background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .chip small { opacity:.65; margin-left:5px; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .link { border:0; background:none; color:var(--accent); cursor:pointer; padding:0; font-weight:600; font-size:13px; }
+  .link.danger { color:var(--danger); }
+  .file-row { display:flex; gap:8px; flex-wrap:nowrap; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+  #uploadBtn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #clear { flex:none; white-space:nowrap; }
+  .btn { border:1px solid var(--line); background:transparent; padding:7px 13px; border-radius:11px; cursor:pointer; font-size:13px; font-weight:550; transition:background .15s; }
+  .btn:hover { background:var(--hover); }
+  .btn.primary { background:linear-gradient(135deg,var(--accent2),var(--accent)); border:0; color:#fff; }
+
+  /* ---------- top right ---------- */
+  #topright { position:absolute; top:14px; right:14px; z-index:1000; display:flex; gap:8px; align-items:flex-start; }
+  #topright > .glass { display:flex; padding:4px; border-radius:14px; gap:2px; }
+  #view button { border:0; background:transparent; padding:0 14px; height:34px; border-radius:10px; cursor:pointer; font-weight:600; font-size:13px; color:var(--muted); }
+  #view button.on { background:linear-gradient(135deg,var(--accent2),var(--accent)); color:#fff; }
+  #topright .ib { width:34px; height:34px; }
+  #exportWrap { position:relative; }
+  #exportMenu { position:absolute; right:0; top:44px; width:260px; padding:6px; display:none; flex-direction:column; border-radius:14px; }
+  #exportMenu.open { display:flex; }
+  #exportMenu button { border:0; background:transparent; text-align:left; padding:9px 10px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:550; }
+  #exportMenu button:hover { background:var(--hover); }
+  #exportMenu small { display:block; color:var(--muted); font-weight:400; }
+  #exportMenu hr { border:0; border-top:1px solid var(--line); margin:4px 6px; }
+
+  /* ---------- bottom left: legend + display mode + base layer ---------- */
+  #bl { position:absolute; left:14px; bottom:26px; z-index:1000; display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
+  .seg { display:flex; padding:4px; gap:2px; border-radius:14px; }
+  .seg button { border:0; background:transparent; padding:7px 11px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600; color:var(--muted); white-space:nowrap; }
+  .seg button.on { background:var(--accent-soft); color:var(--accent); }
+  #legend { display:none; padding:8px 12px; border-radius:12px; font-size:12px; color:var(--muted); }
+  #legend.show { display:block; }
+  #legend .bar { width:180px; height:9px; border-radius:5px; background:linear-gradient(90deg,#fde7d6,#f1641e,#9c2412); margin:5px 0 3px; }
+
+  /* ---------- right sheet (place orders / statistics) ---------- */
+  #sheet { position:absolute; z-index:1100; top:66px; right:14px; width:min(430px, calc(100vw - 28px)); max-height:calc(100% - 150px); display:flex; flex-direction:column; overflow:hidden; opacity:0; transform:translateX(24px) scale(.98); pointer-events:none; transition:opacity .22s, transform .22s; border-radius:22px; }
+  #sheet.open { opacity:1; transform:none; pointer-events:auto; }
+  /* one soft tint across the whole top of the sheet, fading out smoothly below the header and tabs */
+  #sheet::before { content:""; position:absolute; left:0; right:0; top:0; height:240px; pointer-events:none; z-index:0;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--c) 20%, transparent) 0%, color-mix(in srgb, var(--c) 8%, transparent) 55%, transparent 100%); }
+  #sheet > * { position:relative; z-index:1; }
+  .m-head { padding:18px 18px 14px; display:flex; gap:12px; align-items:flex-start; flex:none; }
+  .m-pin { width:42px; height:42px; border-radius:14px; background:var(--c); color:#fff; display:grid; place-items:center; font-size:20px; flex:none; box-shadow:0 4px 12px color-mix(in srgb, var(--c) 45%, transparent); }
+  .m-title { font-size:20px; font-weight:780; letter-spacing:-.02em; line-height:1.2; }
+  .m-sub { color:var(--muted); font-size:13px; }
+  .m-shop { display:inline-flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; font-weight:650; padding:3px 10px 3px 4px; border-radius:99px; background:color-mix(in srgb, var(--c) 14%, transparent); }
+  .m-shop .av { width:18px; height:18px; border-radius:6px; font-size:10px; box-shadow:none; }
+  .m-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:0 18px 14px; flex:none; }
+  .m-stat { background:var(--hover); border-radius:12px; padding:8px 10px; min-width:0; }
+  .m-stat b { display:block; font-size:15px; letter-spacing:-.01em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .m-stat span { display:block; font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .m-list { overflow:auto; padding:4px 10px 14px; border-top:1px solid var(--line); }
+  .m-h { padding:12px 8px 6px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; font-weight:600; }
+  .order { display:flex; gap:12px; padding:10px 8px; border-radius:12px; align-items:flex-start; }
+  .order:hover { background:var(--hover); }
+  .order .ic { width:34px; height:34px; border-radius:10px; background:color-mix(in srgb, var(--c) 16%, transparent); display:grid; place-items:center; flex:none; font-size:15px; }
+  .order .mid { flex:1; min-width:0; }
+  .order .tt { font-weight:620; overflow-wrap:anywhere; }
+  .order .tt a, .rk a { color:inherit; text-decoration:none; border-bottom:1px dotted var(--muted); }
+  .order .tt a:hover, .rk a:hover { color:var(--c, var(--accent)); border-bottom-color:var(--c, var(--accent)); }
+  .order .mm { color:var(--muted); font-size:12.5px; overflow-wrap:anywhere; }
+  .order .pr { font-weight:700; white-space:nowrap; text-align:right; }
+  .order .pr small { display:block; color:var(--muted); font-weight:500; font-size:11.5px; }
+  .order .pr s.old { display:block; color:var(--muted); font-weight:500; font-size:12px; }
+  .order .pr .disc { display:inline-block; margin-top:3px; font-size:11px; font-weight:700; color:var(--good); background:color-mix(in srgb, var(--good) 15%, transparent); padding:1px 7px; border-radius:99px; }
+  .badge { display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:99px; background:color-mix(in srgb, var(--c, var(--accent)) 16%, transparent); color:var(--c, var(--accent)); margin-left:4px; white-space:nowrap; }
+  .empty { color:var(--muted); padding:16px 8px; text-align:center; }
+
+  /* stats */
+  .st-body { overflow:auto; padding:0 16px 16px; flex:1 1 auto; min-height:0; }
+  .st-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .chart { margin-top:16px; }
+  .bars { display:flex; align-items:flex-end; gap:2px; height:70px; padding-top:4px; }
+  .bars div { flex:1; min-width:3px; background:color-mix(in srgb, var(--muted) 35%, transparent); border-radius:3px 3px 0 0; }
+  .bars div.in { background:linear-gradient(180deg,var(--accent2),var(--accent)); }
+  #tlBars div { cursor:pointer; transition:background .15s; }
+  #tlBars div:hover { outline:2px solid var(--accent); }
+  .axis { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:4px; }
+  .axis.eq span { flex:1; text-align:center; }
+  .grp { display:flex; align-items:flex-end; gap:6px; height:76px; }
+  .grp > div { flex:1; display:flex; align-items:flex-end; gap:1px; height:100%; }
+  .grp i { flex:1; border-radius:2px 2px 0 0; min-height:1px; }
+  .lgd { display:flex; gap:12px; font-size:11.5px; color:var(--muted); margin-top:6px; flex-wrap:wrap; }
+  .lgd b { display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:4px; vertical-align:-1px; }
+  .tabs { display:flex; flex-wrap:wrap; gap:3px; margin:18px 0 6px; background:var(--hover); padding:3px; border-radius:12px; }
+  .tabs button { flex:1 0 auto; border:0; background:transparent; padding:6px 7px; border-radius:9px; cursor:pointer; font-size:12px; font-weight:600; color:var(--muted); white-space:nowrap; }
+  .tabs button small { font-size:10.5px; }
+  .tabs button.on { background:var(--solid); color:var(--fg); box-shadow:0 1px 3px rgba(0,0,0,.12); }
+  .rk { position:relative; display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; cursor:pointer; overflow:hidden; margin-bottom:6px; }
+  .rk:last-child { margin-bottom:0; }
+  .rk:hover { background:var(--hover); }
+  .rk.on { outline:2px solid var(--accent); }
+  .rk .bar { position:absolute; left:0; top:0; bottom:0; background:var(--accent-soft); border-radius:10px; z-index:-1; }
+  .rk .no { width:20px; color:var(--muted); font-size:12px; font-weight:700; flex:none; }
+  .rk .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  .rk .nm small { color:var(--muted); font-weight:400; margin-left:4px; }
+  .rk .vl { font-weight:700; white-space:nowrap; font-size:13px; text-align:right; }
+  .rk .vl small { color:var(--muted); font-weight:500; margin-left:6px; }
+  .rk-list { position:relative; z-index:0; }
+  .tab-note { font-size:12px; color:var(--muted); padding:2px 10px 8px; }
+
+  /* ---------- shop dialog ---------- */
+  #dlg { position:absolute; inset:0; z-index:1300; display:none; place-items:center; background:rgba(0,0,0,.35); backdrop-filter:blur(3px); }
+  #dlg.open { display:grid; }
+  #dlg .box { width:min(400px, calc(100vw - 28px)); max-height:calc(100% - 28px); overflow:auto; padding:22px; background:var(--solid); border-radius:22px; box-shadow:var(--shadow); }
+  #dlg h3 { margin:0 0 16px; font-size:18px; }
+  #dlg label.f { font-size:12px; color:var(--muted); display:block; margin-bottom:5px; }
+  #dlg input[type=text] { width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:transparent; color:var(--fg); font-size:15px; }
+  #dlg .logo-row { display:flex; align-items:center; gap:12px; margin:16px 0; }
+  #dlg .logo-row .av { width:52px; height:52px; border-radius:16px; font-size:24px; }
+  .logo-pick { position:relative; display:block; flex:none; cursor:pointer; border-radius:16px; }
+  .logo-pick .logo-edit { position:absolute; inset:0; border-radius:16px; display:grid; place-items:center; background:rgba(0,0,0,.45); color:#fff; opacity:0; transition:opacity .15s; }
+  .logo-pick:hover .logo-edit, .logo-pick:focus-within .logo-edit { opacity:1; }
+  #dlgRemoveLogo:hover { color:var(--danger); background:color-mix(in srgb, var(--danger) 12%, transparent); }
+  #dlg .hint { margin:5px 0 16px; }
+  .swatches { display:flex; gap:8px; margin:6px 0 18px; flex-wrap:wrap; }
+  .sw { width:28px; height:28px; border-radius:50%; border:3px solid transparent; background:var(--c); cursor:pointer; outline:1px solid var(--line); }
+  .sw.on { border-color:var(--solid); outline:2px solid var(--c); }
+  .sw.custom { position:relative; background:conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); overflow:hidden; display:block; }
+  .sw.custom.has { background:var(--c); }
+  .sw.custom input { position:absolute; inset:-8px; width:48px; height:48px; opacity:0; cursor:pointer; }
+  .sw.custom::after { content:"+"; position:absolute; inset:0; display:grid; place-items:center; color:#fff; font-weight:800; text-shadow:0 1px 2px rgba(0,0,0,.6); pointer-events:none; }
+  .sw.custom.has::after { content:"🎨"; font-size:12px; }
+  .danger-row { display:flex; gap:16px; padding:12px 0; margin-bottom:12px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+
+  #toast { position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:1200; padding:9px 18px; font-size:13px; display:none; border-radius:99px; max-width:min(560px, 90vw); text-align:center; }
+  body.drop::after { content:"Відпустіть файли, щоб додати замовлення до вибраного магазину"; position:absolute; inset:0; z-index:2000; display:grid; place-items:center; text-align:center; padding:20px; font-size:22px; font-weight:700; background:rgba(241,100,30,.22); border:4px dashed var(--accent); }
+
+  /* read-only view opened from a shared link */
+  body.viewer #addShop, body.viewer .shop .acts [data-a=up], body.viewer .shop .acts [data-a=edit], body.viewer .file-row,
+  body.viewer #privacyBtn, body.viewer .own-only { display:none !important; }
+  body.viewer #viewerLink { display:inline; }
+
+  /* ---------- leaflet ---------- */
+  .leaflet-control-zoom { border:0 !important; box-shadow:var(--shadow) !important; border-radius:14px !important; overflow:hidden; margin:0 14px 26px 0 !important; }
+  .leaflet-control-zoom a { background:var(--glass) !important; backdrop-filter:blur(18px); color:var(--fg) !important; border-color:var(--line) !important; width:36px !important; height:36px !important; line-height:36px !important; }
+  .leaflet-control-attribution { background:var(--glass) !important; color:var(--muted) !important; border-radius:8px 0 0 0; }
+  .leaflet-control-attribution a { color:var(--muted) !important; }
+  .pinwrap, .clusterwrap, .originwrap { filter:drop-shadow(0 3px 3px rgba(0,0,0,.35)); transition:transform .15s; }
+  .pinwrap { transform-origin:50% 100%; }
+  .pinwrap:hover, .clusterwrap:hover { transform:scale(1.1); }
+  .pinwrap.sel { transform:scale(1.25); filter:drop-shadow(0 0 8px var(--c)) drop-shadow(0 3px 3px rgba(0,0,0,.4)); z-index:9999 !important; }
+  .leaflet-tooltip.origin-tip { font-weight:650; border-radius:8px; }
+
+  /* goal bar under the revenue tile */
+  .gbar { display:none; height:4px; border-radius:2px; background:var(--hover); margin:6px 6px 0; overflow:hidden; }
+  .gbar.show { display:block; }
+  .gbar u { display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent2),var(--accent)); border-radius:2px; }
+  /* money sheet */
+  .goal-big b { font-size:28px; font-weight:800; letter-spacing:-.02em; }
+  .goal-big span { color:var(--muted); margin-left:8px; }
+  .prog { position:relative; height:12px; border-radius:99px; background:var(--hover); margin-top:8px; }
+  .prog i { display:block; height:100%; max-width:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
+  .prog em { position:absolute; top:-4px; bottom:-4px; width:2px; margin-left:-1px; background:var(--fg); opacity:.5; border-radius:1px; }
+  .money-in { display:inline-flex; align-items:center; gap:4px; border:1px solid var(--line); border-radius:11px; padding:0 10px; background:var(--solid); flex:none; }
+  .money-in span { color:var(--muted); font-weight:600; }
+  .money-in input { border:0; outline:0; background:transparent; color:var(--fg); font:inherit; font-size:15px; width:110px; padding:8px 0; }
+  .money-in.sm { padding:0 8px; border-radius:9px; }
+  .money-in.sm input { width:58px; font-size:13px; padding:6px 0; }
+  .money-in:focus-within { border-color:var(--accent); }
+  .gform { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .mg { display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid var(--line); }
+  .mg:last-child { border-bottom:0; }
+  .mg .mid { flex:1; min-width:0; }
+  .mg .tt { font-weight:620; font-size:13px; overflow-wrap:anywhere; }
+  .mg .tt a { color:inherit; text-decoration:none; border-bottom:1px dotted var(--muted); }
+  .mg .mm { color:var(--muted); font-size:12px; }
+  .mg-r { width:88px; text-align:right; font-size:13px; flex:none; }
+  .mg-r small { display:block; color:var(--muted); font-size:11px; }
+  body.blurnames .sn { filter:blur(5px); }
+  .muted { color:var(--muted); }
+  .cfg { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; }
+  .cfg label { display:inline-flex; gap:6px; align-items:center; font-size:13px; cursor:pointer; }
+  table.tax { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
+  table.tax th { text-align:right; font-size:10.5px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; padding:6px 4px; }
+  table.tax td { text-align:right; padding:8px 4px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  table.tax th:first-child, table.tax td:first-child { text-align:left; }
+  table.tax tr.tot td { font-weight:800; }
+  .tax-wrap { overflow-x:auto; }
+  @media (max-width:700px) { table.tax { font-size:12px; } table.tax td, table.tax th { padding:7px 2px; } table.tax td small { display:none; } }
+  /* sales calendar */
+  .cal { display:grid; grid-template-rows:repeat(7,1fr); grid-auto-flow:column; grid-auto-columns:1fr; gap:2px; }
+  .cal i { aspect-ratio:1; border-radius:2px; background:var(--hover); cursor:pointer; }
+  .cal i:hover { outline:1.5px solid var(--accent); }
+  .cal i.out { background:transparent; cursor:default; }
+  .cal i.out:hover { outline:0; }
+  .cal i.l1 { background:color-mix(in srgb, var(--accent) 28%, transparent); }
+  .cal i.l2 { background:color-mix(in srgb, var(--accent) 50%, transparent); }
+  .cal i.l3 { background:color-mix(in srgb, var(--accent) 75%, transparent); }
+  .cal i.l4 { background:var(--accent); }
+  /* instant tooltip for small chart cells (the native title shows only after ~1 s) */
+  #tip { position:fixed; z-index:3000; pointer-events:none; background:var(--fg); color:var(--solid); font-size:12px; font-weight:600; padding:4px 9px; border-radius:8px; white-space:nowrap; box-shadow:var(--shadow); opacity:0; transition:opacity .08s; }
+  #tip.show { opacity:1; }
+  /* timelapse badge */
+  #tlBox { position:absolute; z-index:1050; bottom:26px; left:50%; transform:translateX(-50%); width:min(500px, calc(100vw - 28px)); display:none; flex-direction:column; gap:2px; padding:6px 8px 8px; border-radius:18px; user-select:none; }
+  #tlBox.show { display:flex; }
+  #tlBox .tl-row { display:flex; align-items:center; gap:2px; }
+  #tlBox .tl-mid { flex:1; min-width:0; display:flex; align-items:baseline; gap:8px; padding:0 6px; white-space:nowrap; overflow:hidden; }
+  #tlBox b { font-size:16px; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+  #tlBox span { color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; }
+  #tlBox .ib { font-size:18px; font-weight:700; }
+  #tlPlay { background:var(--accent-soft); color:var(--accent) !important; }
+  #tlSpeed { border:1px solid var(--line); background:var(--solid); color:var(--fg); border-radius:9px; font:inherit; font-size:12px; padding:4px 6px; cursor:pointer; }
+  #tlRange { width:100%; margin:2px 0 0; accent-color:var(--accent); cursor:pointer; }
+  @media (min-width:701px) and (max-width:1180px) { #tlBox { bottom:176px; } }
+
+  @media (max-width:700px) {
+    #tlBox { top:auto; bottom:46%; }
+    #left { top:10px; left:10px; width:calc(100vw - 20px); max-height:calc(100% - 170px); gap:8px; }
+    #shopList { max-height:108px; }
+    #sheet { top:auto; bottom:0; right:0; left:0; width:100%; max-height:66%; border-radius:22px 22px 0 0; transform:translateY(40px); }
+    #topright { top:auto; bottom:16px; right:10px; flex-direction:column-reverse; align-items:flex-end; }
+    #topright > .glass { flex-direction:column; }
+    #view button { padding:0 8px; font-size:12px; }
+    #exportMenu { top:auto; bottom:0; right:48px; }
+    #bl { left:10px; bottom:16px; }
+    .seg button { padding:7px 9px; font-size:12px; }
+    #modes .tx { display:none; }
+    #modes button { font-size:16px; padding:5px 11px; }
+    #legend .bar { width:140px; }
+    .leaflet-control-zoom { display:none; }
+    #toast { bottom:auto; top:12px; border-radius:14px; }
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="left">
+  <div id="shopsCard" class="glass">
+    <div class="sh-head"><b id="shopsTitle">Мої магазини</b><span id="miniShops"></span><span style="flex:1"></span><button class="btn primary" id="addShop" style="padding:5px 12px">＋ Додати</button><a id="viewerLink" href="./">Створити свою мапу →</a><button class="ib" id="blurShops"></button><button class="ib" id="collapseShops"></button></div>
+    <div id="shopList"></div>
+  </div>
+
+  <div id="kpis">
+    <div class="glass kpi"><b id="kOrders">0</b><span>Замовлень</span><i id="dOrders"></i></div>
+    <div class="glass kpi"><b id="kCities">0</b><span>Міст</span><i id="dCities"></i></div>
+    <div class="glass kpi"><b id="kCountries">0</b><span>Країн</span><i id="dCountries"></i></div>
+    <div class="glass kpi"><b id="kRev">—</b><span>Дохід</span><i id="dRev"></i><em id="gRev" class="gbar"><u></u></em></div>
+    <div class="glass kpi own-only"><b id="kCosts">—</b><span>Витрати</span><i id="dCosts"></i></div>
+    <div class="glass kpi own-only"><b id="kProfit">—</b><span>Чистий прибуток</span><i id="dProfit"></i></div>
+  </div>
+
+  <div id="search" class="glass">
+    <span aria-hidden="true">🔍</span>
+    <input id="q" type="search" placeholder="Пошук міста, країни чи покупця" autocomplete="off">
+    <button class="ib" id="toggleFilters" title="Фільтри"></button>
+  </div>
+
+  <div id="filtersCard" class="glass">
+    <div class="lbl">Період</div>
+    <div class="chips" id="rangeChips"></div>
+    <div id="customRange" style="display:none;gap:8px;align-items:center;margin-top:10px"><input type="date" id="dFrom" aria-label="Початок"><span style="color:var(--muted)">—</span><input type="date" id="dTo" aria-label="Кінець"></div>
+    <div id="rangeNote" class="hint" style="margin-top:6px"></div>
+    <div class="lbl">Порівнювати з</div>
+    <div class="chips" id="cmpChips"></div>
+    <div class="lbl">Товар</div>
+    <div id="itemFilter"></div>
+    <div class="lbl">Покупці</div>
+    <div class="chips"><button class="chip" id="repeatChip">🔁 Лише повторні покупці</button></div>
+    <div class="lbl">Валюта сум</div>
+    <div class="chips" id="curChips"></div>
+    <div id="curNote" class="hint" style="margin-top:6px"></div>
+    <div class="lbl">Країни</div>
+    <div class="chips" id="countryChips"></div>
+    <div class="row" style="margin-top:12px"><button class="link" id="reset">Скинути фільтри</button><button class="link" id="fit">Показати всі піни</button></div>
+    <div class="file-row">
+      <button class="btn primary" id="uploadBtn">📂 Завантажити CSV / JSON</button>
+      <button class="btn" id="clear" title="Очистити кеш геокодингу">Скинути кеш</button>
+    </div>
+    <input id="file" type="file" accept=".csv,.json" multiple hidden>
+    <input id="restoreFile" type="file" accept=".json" hidden>
+  </div>
+</div>
+
+<div id="topright">
+  <div class="glass" id="view"><button data-v="world" class="on">Світ</button><button data-v="usa">США</button></div>
+  <div class="glass">
+    <button class="ib" id="routesBtn" title="Маршрути від вашого міста до покупців"></button>
+    <button class="ib" id="statsBtn" title="Статистика"></button>
+    <button class="ib own-only" id="moneyBtn" title="Гроші: ціль, собівартість, знижки, податок"></button>
+    <button class="ib" id="playTop" title="Таймлапс: як з'являлися замовлення"></button>
+    <button class="ib" id="privacyBtn" title="Приватний режим"></button>
+    <button class="ib" id="themeBtn" title="Тема"></button>
+    <div id="exportWrap">
+      <button class="ib" id="exportBtn" title="Експорт і дані"></button>
+      <div id="exportMenu" class="glass">
+        <button id="expPng">🖼 Зображення мапи (PNG)<small>Для поста чи звіту, з назвою магазину</small></button>
+        <button id="expCsv">📄 Замовлення (CSV)<small>Лише ті, що зараз видно на мапі</small></button>
+        <button id="expShare" class="own-only">🔗 Посилання для перегляду<small>Мапа без імен покупців — для друзів</small></button>
+        <button id="expInstall">📲 Встановити як застосунок<small>Іконка на телефоні чи в Dock, відкривається без інтернету</small></button>
+        <hr class="own-only">
+        <button id="expBackup" class="own-only">💾 Резервна копія (JSON)<small>Усі магазини й замовлення в одному файлі</small></button>
+        <button id="expRestore" class="own-only">📥 Відновити з копії<small>Замінить поточні дані</small></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="bl">
+  <div class="glass" id="legend"><div class="row"><b style="color:var(--fg)" id="legendTitle">Замовлень у регіоні</b><button class="link" id="perCapBtn" style="font-size:12px"></button></div><div class="bar"></div><div class="row"><span id="legendMin">1</span><span id="legendMax"></span></div></div>
+  <div class="glass seg" id="modes"><button data-d="pins" title="Піни">📍<span class="tx"> Піни</span></button><button data-d="groups" title="Групи">⭕<span class="tx"> Групи</span></button><button data-d="heat" title="Теплова мапа">🔥<span class="tx"> Теплова</span></button><button data-d="regions" title="Регіони: країни й штати">🗺<span class="tx"> Регіони</span></button></div>
+  <div class="glass seg" id="layers"><button data-m="map" class="on">Мапа</button><button data-m="sat">Супутник</button><button data-m="terrain">Рельєф</button></div>
+</div>
+
+<div id="sheet" class="glass" aria-live="polite"></div>
+<div id="tlBox" class="glass" title="Прокручуйте тут, щоб гортати дні · ← → · пробіл — пауза">
+  <div class="tl-row">
+    <button class="ib" id="tlPrev" title="Попередній день (←)">‹</button>
+    <button class="ib" id="tlPlay"></button>
+    <button class="ib" id="tlNext" title="Наступний день (→)">›</button>
+    <div class="tl-mid"><b id="tlDate"></b><span id="tlCount"></span></div>
+    <select id="tlSpeed" title="Швидкість"></select>
+    <button class="ib" id="tlStop" title="Закрити таймлапс">✕</button>
+  </div>
+  <input type="range" id="tlRange" min="0" max="0" value="0" aria-label="День таймлапсу">
+</div>
+
+<div id="dlg">
+  <div class="box">
+    <div class="row" style="margin:-4px -6px 12px 0"><h3 id="dlgTitle" style="margin:0">Новий магазин</h3><button class="ib" id="dlgClose" title="Закрити (Esc)">✕</button></div>
+    <label class="f">Назва магазину</label>
+    <input type="text" id="dlgName" maxlength="40" placeholder="Наприклад, My Handmade Shop">
+    <div class="logo-row">
+      <label class="logo-pick" title="Змінити логотип"><div class="av" id="dlgAv"></div><span class="logo-edit"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span><input id="dlgFile" type="file" accept="image/*" hidden></label>
+      <div class="hint" id="dlgLogoHint" style="flex:1;margin:0"></div>
+      <button class="ib" id="dlgRemoveLogo" title="Прибрати логотип"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
+    </div>
+    <div class="row"><label class="f" style="margin:0">Колір пінів</label><button class="link" id="dlgFromLogo" style="display:none">🎨 Взяти з логотипа</button></div>
+    <div class="swatches" id="swatches"></div>
+    <label class="f">Місто відправки (для маршрутів і відстаней)</label>
+    <input type="text" id="dlgOrigin" placeholder="Наприклад, Kyiv, Ukraine">
+    <div class="hint" id="dlgOriginHint">Необов'язково.</div>
+    <div class="danger-row" id="dlgDanger">
+      <button class="link danger" id="dlgClear">Очистити дані</button>
+      <button class="link danger" id="dlgDelete">Видалити магазин</button>
+    </div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="dlgCancel">Скасувати</button><button class="btn primary" id="dlgSave">Зберегти</button></div>
+  </div>
+</div>
+<div id="toast" class="glass"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const ls = { get(k){ try { return localStorage.getItem(k); } catch { return null; } }, set(k,v){ try { localStorage.setItem(k,v); return true; } catch { return false; } }, del(k){ try { localStorage.removeItem(k); } catch {} } };
+let toastTimer; const toast = (t, ms) => { const el=$('toast'); clearTimeout(toastTimer); if(!t){ el.style.display='none'; return; } el.textContent=t; el.style.display='block'; if(ms) toastTimer=setTimeout(()=>el.style.display='none', ms); };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const COLORS = ['#f1641e','#2f80ed','#1fa971','#9b51e0','#e5484d','#e0a800','#0fa3b1','#e255a1'];
+const isDesktop = () => matchMedia('(min-width:701px)').matches;
+let theme = ls.get('etsyTheme2') === 'dark' ? 'dark' : 'light';
+document.documentElement.dataset.theme = theme;
+let viewOnly = false; // true when the page was opened from a shared read-only link
+
+// ================= storage: IndexedDB (falls back to localStorage) =================
+const kv = (() => {
+  let dbp = null;
+  const db = () => dbp || (dbp = new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error('no indexedDB'));
+    const r = indexedDB.open('etsy-orders-map', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const tx = async (mode, fn) => { const d = await db(); return new Promise((res, rej) => { const t = d.transaction('kv', mode), q = fn(t.objectStore('kv')); t.oncomplete = () => res(q.result); t.onerror = t.onabort = () => rej(t.error); }); };
+  return {
+    async get(k) { try { return await tx('readonly', s => s.get(k)); } catch { try { return JSON.parse(ls.get('kv:'+k)) ?? undefined; } catch { return undefined; } } },
+    async set(k, v) { if (viewOnly) return true; try { await tx('readwrite', s => s.put(v, k)); return true; } catch { return ls.set('kv:'+k, JSON.stringify(v)); } },
+    async del(k) { if (viewOnly) return; try { await tx('readwrite', s => s.delete(k)); } catch {} ls.del('kv:'+k); },
+  };
+})();
+
+// ================= shops =================
+let shops = [], activeId = null;
+const uid = () => 's' + Math.random().toString(36).slice(2,9);
+const shopMeta = ({places, loading, ledger, ...m}) => m;
+function saveShops() { kv.set('shops', shops.map(shopMeta)); }
+async function saveData(s) { if (!await kv.set('data:'+s.id, s.places)) toast('Не вдалося зберегти дані в браузері — після перезавантаження їх треба буде додати знову.', 6000); }
+const shopById = id => shops.find(s => s.id===id);
+const activeShop = () => shopById(activeId) || shops[0];
+const avatarHTML = (s, cls='av') => s.logo ? `<img class="${cls}" style="--c:${s.color}" src="${esc(s.logo)}" alt="">` : `<div class="${cls}" style="--c:${s.color}">${esc((s.name.trim()[0]||'M').toUpperCase())}</div>`;
+const nOrders = s => s.places.reduce((n,p)=>n+p.orders.length,0);
+const placeKey = l => [l.city,l.state,l.country].map(x => (x||'').trim().toLowerCase()).join('|');
+
+// repeat buyers: every order gets nth (1-based) and of (total orders by that buyer in this shop)
+const buyerKey = o => (o.buyer||'').trim().toLowerCase().replace(/\s+/g,' ');
+function computeRepeat(shop) {
+  const by = new Map();
+  shop.places.forEach(p => p.orders.forEach(o => { const k = buyerKey(o); o.nth = 0; o.of = 0; if (k) { if (!by.has(k)) by.set(k, []); by.get(k).push(o); } }));
+  by.forEach(list => { list.sort((a,b) => (Date.parse(a.date)||0) - (Date.parse(b.date)||0)); list.forEach((o,i) => { o.nth = i+1; o.of = list.length; }); });
+}
+
+const svg = (p, s=17) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const PIN = '<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>';
+const ICON = {
+  up:     svg('<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>'),
+  edit:   svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
+  pin:    svg(PIN),
+  pinOff: svg(PIN + '<path d="M3 3l18 18"/>'),
+  route:  svg('<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5"/>'),
+  stats:  svg('<path d="M3 21h18"/><path d="M7 17v-6M12 17V5M17 17v-9"/>'),
+  lock:   svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
+  unlock: svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/>'),
+  download: svg('<path d="M12 4v11M7 10l5 5 5-5M4 20h16"/>'),
+  sun:    svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  moon:   svg('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
+  filter: svg('<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>'),
+  chevron: svg('<path d="M6 15l6-6 6 6"/>'),
+  wallet: svg('<path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v3"/><path d="M3 6v12a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-3"/><path d="M21 12h-4a2 2 0 0 0 0 4h4z"/>'),
+  play:   svg('<path d="M7 4.5v15l12.5-7.5z"/>'),
+  pause:  svg('<path d="M8 5v14M16 5v14"/>'),
+  eye:    svg('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+  eyeOff: svg('<path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17.8 17.8 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.9 0 3.6-.6 5-1.4"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'),
+};
+let blurNames = ls.get('etsyBlurNames') === '1';
+function syncBlur() {
+  document.body.classList.toggle('blurnames', blurNames);
+  $('blurShops').innerHTML = blurNames ? ICON.eyeOff : ICON.eye;
+  $('blurShops').classList.toggle('on', blurNames);
+  $('blurShops').title = blurNames ? 'Показати назви й логотипи магазинів' : 'Розмити назви й логотипи магазинів (для скріншотів)';
+}
+$('blurShops').onclick = () => { blurNames = !blurNames; ls.set('etsyBlurNames', blurNames ? '1' : '0'); syncBlur(); if (routesOn) redraw(false); };
+syncBlur();
+// the shops card can be folded to a single line with small logos (remembered per browser)
+function syncShopsCollapse() {
+  const c = ls.get('etsyShopsCollapsed') === '1';
+  $('shopsCard').classList.toggle('collapsed', c);
+  $('collapseShops').innerHTML = ICON.chevron;
+  $('collapseShops').title = c ? 'Показати магазини' : 'Сховати магазини';
+}
+$('collapseShops').onclick = () => { ls.set('etsyShopsCollapsed', ls.get('etsyShopsCollapsed') === '1' ? '0' : '1'); syncShopsCollapse(); };
+syncShopsCollapse();
+
+function renderShops() {
+  $('miniShops').innerHTML = shops.map(s => avatarHTML(s).replace('class="av"', `class="av${s.visible ? '' : ' off'}" title="${esc(s.name)}"`)).join('');
+  const box = $('shopList'); box.innerHTML = '';
+  shops.forEach(s => {
+    const el = document.createElement('div'); el.className = 'shop'+(s.id===activeId && !viewOnly ?' active':''); el.style.setProperty('--c', s.color);
+    const n = nOrders(s);
+    el.innerHTML = `${avatarHTML(s)}<div class="t"><div class="n">${esc(s.name)}</div><div class="s">${s.loading ? '⏳ '+esc(s.loading) : n ? `<span class="dotc"></span>${n} замовлень · ${s.places.length} міст${s.ledger?.length ? ' · виписка ✓' : ''}` : 'Немає даних — завантажте CSV'}</div></div>
+      <div class="acts"><button class="ib" data-a="up" title="Завантажити замовлення">${ICON.up}</button><button class="ib" data-a="edit" title="Редагувати">${ICON.edit}</button><button class="ib${s.visible?'':' off'}" data-a="eye" title="${s.visible?'Сховати піни магазину':'Показати піни магазину'}">${s.visible?ICON.pin:ICON.pinOff}</button></div>`;
+    el.onclick = e => {
+      const a = e.target.closest('button')?.dataset.a;
+      activeId = s.id;
+      if (a==='up') $('file').click();
+      else if (a==='edit') openDlg(s);
+      else if (a==='eye') { s.visible = !s.visible; saveShops(); if (!s.visible && selected?.shop===s) closeSheet(); refresh(true); }
+      renderShops(); syncUploadLabel();
+    };
+    box.appendChild(el);
+  });
+}
+function syncUploadLabel() { if (activeShop()) $('uploadBtn').textContent = `📂 Завантажити для «${activeShop().name}»`; }
+$('uploadBtn').onclick = () => $('file').click();
+
+// ---- add / edit shop dialog ----
+let dlgShop = null, draft = {};
+function dlgRender() {
+  const tmp = { ...draft, name: $('dlgName').value || draft.name };
+  $('dlgAv').outerHTML = avatarHTML(tmp).replace('class="av"','class="av" id="dlgAv"');
+  $('dlgRemoveLogo').style.visibility = draft.logo ? '' : 'hidden';
+  $('dlgLogoHint').textContent = draft.logo ? 'Наведіть на логотип і натисніть, щоб замінити.' : 'Натисніть на квадрат, щоб завантажити логотип.';
+  const sw = $('swatches'); sw.innerHTML='';
+  COLORS.forEach(c => { const b=document.createElement('button'); b.className='sw'+(c===draft.color?' on':''); b.style.setProperty('--c',c); b.onclick=()=>{ draft.color=c; dlgRender(); }; sw.appendChild(b); });
+  const custom = !COLORS.includes(draft.color);
+  const lab = document.createElement('label'); lab.className = 'sw custom' + (custom ? ' has on' : ''); lab.title = 'Свій колір';
+  lab.style.setProperty('--c', draft.color);
+  const inp = document.createElement('input'); inp.type = 'color'; inp.value = /^#[0-9a-f]{6}$/i.test(draft.color) ? draft.color : '#f1641e';
+  inp.oninput = () => { draft.color = inp.value; lab.style.setProperty('--c', inp.value); lab.classList.add('has','on'); sw.querySelectorAll('button.sw').forEach(x=>x.classList.remove('on')); $('dlgAv').style.setProperty('--c', inp.value); };
+  lab.appendChild(inp); sw.appendChild(lab);
+  $('dlgFromLogo').style.display = draft.logo ? '' : 'none';
+}
+// dominant saturated colour of an image — ignores transparent, near-white/black and grey pixels
+function dominantColor(src) {
+  const s = 40, c = document.createElement('canvas'); c.width = c.height = s;
+  const x = c.getContext('2d', { willReadFrequently:true }); x.drawImage(src, 0, 0, s, s);
+  const d = x.getImageData(0, 0, s, s).data, B = Array.from({length:12}, () => ({w:0,r:0,g:0,b:0}));
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i+3] < 128) continue;
+    const r=d[i]/255, g=d[i+1]/255, b=d[i+2]/255, mx=Math.max(r,g,b), mn=Math.min(r,g,b), l=(mx+mn)/2, dd=mx-mn;
+    if (dd < .08 || l > .93 || l < .07) continue;
+    const sat = dd / (1 - Math.abs(2*l - 1));
+    if (sat < .3) continue;
+    let h = mx===r ? ((g-b)/dd)%6 : mx===g ? (b-r)/dd+2 : (r-g)/dd+4; h = (h*60+360)%360;
+    const w = sat * (1 - Math.abs(l - .5)), k = B[Math.floor(h/30)%12];
+    k.w += w; k.r += d[i]*w; k.g += d[i+1]*w; k.b += d[i+2]*w;
+  }
+  const top = B.reduce((a,b) => b.w > a.w ? b : a);
+  if (top.w <= 0) return null;
+  let r=top.r/top.w/255, g=top.g/top.w/255, b=top.b/top.w/255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), l=(mx+mn)/2, t=Math.min(.55, Math.max(.38, l));
+  if (t !== l) { const f = t > l ? (t - l) / (1 - l) : (t - l) / l; const mix = v => f > 0 ? v + (1 - v) * f : v * (1 + f); r=mix(r); g=mix(g); b=mix(b); }
+  return '#' + [r,g,b].map(v => Math.round(Math.min(1,Math.max(0,v))*255).toString(16).padStart(2,'0')).join('');
+}
+$('dlgFromLogo').onclick = () => {
+  if (!draft.logo) return;
+  const img = new Image();
+  img.onload = () => { const col = dominantColor(img); if (col) { draft.color = col; dlgRender(); } else toast('На логотипі немає яскравого кольору — оберіть вручну.', 3500); };
+  img.src = draft.logo;
+};
+function confirmBtn(btn, label, action) { btn.onclick = () => { if (btn.dataset.armed) return action(); btn.dataset.armed = '1'; btn.textContent = label; }; }
+function openDlg(shop) {
+  dlgShop = shop;
+  draft = shop ? { name:shop.name, logo:shop.logo, color:shop.color } : { name:'', logo:'', color: COLORS[shops.length % COLORS.length] };
+  $('dlgTitle').textContent = shop ? 'Редагувати магазин' : 'Новий магазин';
+  $('dlgName').value = draft.name;
+  $('dlgOrigin').value = shop?.origin?.q || '';
+  $('dlgOriginHint').textContent = shop?.origin ? 'Знайдено на мапі ✓' : 'Необов\'язково. Потрібно для маршрутів і відстаней.';
+  $('dlgDanger').style.display = shop ? '' : 'none';
+  $('dlgDelete').style.display = shop && shops.length>1 ? '' : 'none';
+  $('dlgClear').style.display = shop && (shop.places.length || shop.ledger?.length) ? '' : 'none';
+  for (const [id, txt] of [['dlgDelete','Видалити магазин'],['dlgClear','Очистити дані']]) { $(id).textContent = txt; delete $(id).dataset.armed; }
+  dlgRender(); $('dlg').classList.add('open'); $('dlgName').focus();
+}
+$('addShop').onclick = () => openDlg(null);
+$('dlgName').oninput = () => !draft.logo && dlgRender();
+$('dlgRemoveLogo').onclick = () => { draft.logo=''; dlgRender(); };
+$('dlgCancel').onclick = $('dlgClose').onclick = () => $('dlg').classList.remove('open');
+$('dlg').onclick = e => { if (e.target === $('dlg')) $('dlg').classList.remove('open'); }; // click on the dimmed backdrop
+$('dlg').onclick = e => { if (e.target.id==='dlg') $('dlg').classList.remove('open'); };
+$('dlgSave').onclick = async () => {
+  const name = $('dlgName').value.trim() || 'Магазин ' + (shops.length + (dlgShop?0:1));
+  let s = dlgShop;
+  if (s) Object.assign(s, { name, logo:draft.logo, color:draft.color });
+  else { s = { id:uid(), name, logo:draft.logo, color:draft.color, visible:true, places:[] }; shops.push(s); activeId = s.id; }
+  const oq = $('dlgOrigin').value.trim();
+  $('dlg').classList.remove('open');
+  if (!oq) delete s.origin;
+  else if (oq !== s.origin?.q) {
+    toast('Шукаю місто відправки…');
+    const c = await geocode({ city:oq });
+    if (c) { s.origin = { q:oq, lat:c[0], lng:c[1] }; toast(''); }
+    else { delete s.origin; toast(`Не вдалося знайти «${oq}» на мапі. Спробуйте формат «Місто, Країна».`, 5000); }
+  }
+  saveShops(); renderShops(); syncUploadLabel(); refresh(false);
+  if (!dlgShop) toast(`Магазин «${name}» додано. Натисніть ⬆ біля нього, щоб завантажити замовлення.`, 5000);
+};
+confirmBtn($('dlgDelete'), 'Точно видалити магазин?', () => {
+  kv.del('data:'+dlgShop.id); kv.del('ledger:'+dlgShop.id); shops = shops.filter(s => s !== dlgShop); activeId = shops[0].id;
+  saveShops(); closeSheet(); $('dlg').classList.remove('open'); renderShops(); syncUploadLabel(); refresh(true);
+});
+confirmBtn($('dlgClear'), 'Точно очистити замовлення й виписки?', () => {
+  dlgShop.places = []; dlgShop.ledger = []; kv.del('data:'+dlgShop.id); kv.del('ledger:'+dlgShop.id); closeSheet(); $('dlg').classList.remove('open'); renderShops(); refresh(true);
+  toast(`Замовлення магазину «${dlgShop.name}» очищено.`, 3000);
+});
+$('dlgFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image(), url = URL.createObjectURL(f);
+  img.onload = () => { const s=128, c=document.createElement('canvas'); c.width=c.height=s; const x=c.getContext('2d'); const m=Math.min(img.width,img.height); x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,s,s); draft.logo=c.toDataURL('image/png'); URL.revokeObjectURL(url); const col = dominantColor(c); if (col) draft.color = col; dlgRender(); };
+  img.src = url; e.target.value = '';
+};
+
+// ================= map + base layers =================
+const map = L.map('map', { worldCopyJump:true, zoomControl:false, minZoom:2 }).setView([25,10], 2);
+L.control.zoom({ position:'bottomright' }).addTo(map);
+const E = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+// crossOrigin lets the PNG export read the tiles (Esri sends Access-Control-Allow-Origin: *)
+const T = p => L.tileLayer(E+p+'/MapServer/tile/{z}/{y}/{x}', { attribution:'Tiles © Esri', maxZoom:18, crossOrigin:'anonymous' });
+const bases = {
+  map: () => [T('World_Street_Map')],
+  dark: () => [T('Canvas/World_Dark_Gray_Base'), T('Canvas/World_Dark_Gray_Reference')].map(l => (l.options.maxNativeZoom = 16, l)),
+  sat: () => [T('World_Imagery'), T('Reference/World_Boundaries_and_Places')],
+  terrain: () => [T('World_Topo_Map')],
+};
+let baseMode = 'map', baseLayers = [];
+function setBase() {
+  baseLayers.forEach(l => map.removeLayer(l));
+  baseLayers = bases[baseMode === 'map' && theme === 'dark' ? 'dark' : baseMode]();
+  baseLayers.forEach((l,i) => { l.addTo(map); if (i===0) l.bringToBack(); });
+}
+document.querySelectorAll('#layers button').forEach(b => b.onclick = () => { baseMode=b.dataset.m; document.querySelectorAll('#layers button').forEach(x=>x.classList.toggle('on',x===b)); setBase(); });
+setBase();
+const views = { world:{c:[25,10],z:2}, usa:{c:[39.5,-98.5],z:4} };
+document.querySelectorAll('#view button').forEach(b => b.onclick = () => { document.querySelectorAll('#view button').forEach(x=>x.classList.toggle('on',x===b)); map.setView(views[b.dataset.v].c, views[b.dataset.v].z); });
+
+// ================= parsing =================
+function parseCSV(text) {
+  const rows=[]; let row=[], cur='', q=false;
+  for (let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){ if(ch=='"'){ if(text[i+1]=='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else if(ch=='"') q=true;
+    else if(ch==','){ row.push(cur); cur=''; }
+    else if(ch=='\n'||ch=='\r'){ if(ch=='\r'&&text[i+1]=='\n') i++; row.push(cur); cur=''; if(row.some(x=>x!=='')) rows.push(row); row=[]; }
+    else cur+=ch;
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  const head = (rows.shift()||[]).map(h=>h.trim().toLowerCase().replace(/^﻿/,''));
+  return rows.map(r => Object.fromEntries(head.map((h,i)=>[h,(r[i]||'').trim()])));
+}
+const pick = (o, keys) => { for (const k of keys) if (o[k]!==undefined && o[k]!==null && o[k]!=='') return o[k]; return ''; };
+const regionNames = (()=>{ try { return new Intl.DisplayNames(['en'],{type:'region'}); } catch { return null; } })();
+function countryName(c) {
+  c = String(c||'').trim();
+  if (/^[A-Za-z]{2}$/.test(c) && regionNames) { try { return regionNames.of(c.toUpperCase()) || c; } catch {} }
+  if (/^(usa|u\.s\.a?\.?|united states of america)$/i.test(c)) return 'United States';
+  return c;
+}
+const num = v => { if (typeof v === 'number') return v; if (v === '' || v == null) return null; const n = parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n) ? null : n; };
+function normalize(o) {
+  // items → [{t: title, id: listing id}]; accepts the JSON from fetch-etsy.mjs, Etsy CSVs and this page's own CSV export
+  let items = [];
+  // p = line price before discount (price × quantity), d = discount on that line, q = quantity
+  if (Array.isArray(o.items)) items = o.items.map(i => typeof i==='string' ? {t:i} : { t:i.title||i.t||'', id:String(i.listing_id||i.id||''), p: num(i.price ?? i.p), d: num(i.discount ?? i.d), q: num(i.quantity ?? i.q) });
+  else if (pick(o,['item name','title'])) items = [{ t:pick(o,['item name','title']), id:String(pick(o,['listing id','listing_id'])), p: num(pick(o,['item total'])), d: num(pick(o,['discount amount'])), q: num(pick(o,['quantity'])) }];
+  else if (pick(o,['items'])) { const ids = String(pick(o,['listing ids'])).split(' | '); items = String(o.items).split(' | ').map((t,i) => ({ t, id: ids[i] || '' })); }
+  return {
+    city: pick(o, ['city','ship city','shipping city']),
+    state: pick(o, ['state','ship state','shipping state','state/province']),
+    country: countryName(pick(o, ['country','country_iso','ship country','shipping country'])),
+    lat: o.lat != null && o.lat !== '' ? +o.lat : null, lng: o.lng != null && o.lng !== '' ? +o.lng : null,
+    order: {
+      id: String(pick(o, ['order id','id','receipt_id'])),
+      date: pick(o, ['sale date','date','created']),
+      itemsCount: num(pick(o, ['number of items','items_count','quantity'])) ?? (items.length || null),
+      items,
+      buyer: pick(o, ['full name','ship name','name','buyer']),
+      total: num(pick(o, ['order total','order value','total','item total'])),
+      itemLevel: !pick(o, ['order total','order value','total']) && !!pick(o, ['item total']),
+      // order-wide discount (coupon/sale) from "Sold Orders"; item rows carry their own in items[].d
+      discount: pick(o, ['order total','order value','total']) || !pick(o, ['item total']) ? num(pick(o, ['discount amount','discount','discount_amt'])) : null,
+      shipping: num(pick(o, ['shipping','order shipping','shipping_cost'])),
+      currency: pick(o, ['currency']) || 'USD',
+      coupon: pick(o, ['coupon code']) || '',
+      couponInfo: pick(o, ['coupon details']) || '',
+      shipped: pick(o, ['date shipped','shipped_date']) || '',
+    },
+  };
+}
+// combine the same order coming from different exports (e.g. "Sold Orders" + "Sold Order Items")
+function mergeOrder(o, n) {
+  const m = { ...o };
+  ['date','buyer','currency','coupon','couponInfo','shipped'].forEach(k => { if (n[k]) m[k] = n[k]; });
+  if (n.items?.length) m.items = n.items;
+  if (n.itemsCount != null) m.itemsCount = n.itemsCount;
+  if (n.shipping != null) m.shipping = n.shipping;
+  if (n.discount != null) m.discount = n.discount;
+  if (n.total != null && (!n.itemLevel || o.itemLevel || o.total == null)) { m.total = n.total; m.itemLevel = n.itemLevel; }
+  return m;
+}
+const itemsOf = o => (o.items||[]).map(i => typeof i==='string' ? {t:i} : i);
+// one order line: price before discount (p), the discount on it (disc) and what the buyer actually paid
+// (per-item discount when the file has it, otherwise the order's discount split by item price)
+function linePaid(it, o) {
+  const its = itemsOf(o);
+  if (it.p == null) { const v = its.length === 1 && o.total != null ? o.total - (o.itemLevel ? 0 : (o.shipping || 0)) : null; return { p:null, disc:0, paid: v != null && v >= 0 ? v : null }; }
+  const sumP = its.reduce((s, x) => s + (x.p || 0), 0);
+  const share = !its.some(x => x.d > 0) && o.discount > 0 && it.p > 0 && sumP > 0 ? o.discount * it.p / sumP : 0;
+  const disc = Math.min(it.d > 0 ? it.d : share, it.p);
+  return { p:it.p, disc, paid:it.p - disc };
+}
+const orderDiscount = o => o.discount > 0 ? o.discount : itemsOf(o).reduce((s, it) => s + (it.d > 0 ? it.d : 0), 0);
+const shipDays = o => { const a = Date.parse(o.date), b = Date.parse(o.shipped); if (isNaN(a) || isNaN(b) || b < a - 864e5) return null; return Math.max(0, Math.round((b - a) / 864e5)); };
+const itemKey = it => it.id || it.t || '';
+const fmtDate = s => { const t = Date.parse(s); return isNaN(t) ? (s||'') : new Date(t).toLocaleDateString('uk-UA',{day:'numeric',month:'short',year:'numeric'}); };
+const fmtKm = km => Math.round(km).toLocaleString('uk-UA') + ' км';
+const distKm = (a, b) => { const R=6371, r=Math.PI/180, dLa=(b[0]-a[0])*r, dLo=(b[1]-a[1])*r; const h=Math.sin(dLa/2)**2+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
+
+// ================= money (optionally converted into one currency) =================
+const CURS = [['','Як у замовленнях'],['USD','$ USD'],['EUR','€ EUR'],['GBP','£ GBP'],['CAD','C$ CAD'],['AUD','A$ AUD'],['UAH','₴ UAH']];
+let dispCur = ls.get('etsyCur') || '', rates = null, ratesDate = '';
+const fmtMoney = (v, cur) => { try { return new Intl.NumberFormat('en-US',{style:'currency',currency:cur,currencyDisplay:'narrowSymbol',maximumFractionDigits:2}).format(v); } catch { return v.toFixed(2)+' '+cur; } };
+const fmtCompact = (v, cur) => { try { return new Intl.NumberFormat('en-US',{style:'currency',currency:cur,currencyDisplay:'narrowSymbol',notation:'compact',maximumFractionDigits:1}).format(v); } catch { return fmtMoney(v,cur); } };
+const conv = (v, from) => { if (from === dispCur) return v; if (!rates || !rates[from] || !rates[dispCur]) return null; return v / rates[from] * rates[dispCur]; };
+async function loadRates() {
+  const today = new Date().toISOString().slice(0,10);
+  try { const c = JSON.parse(ls.get('etsyRates') || 'null'); if (c?.day === today) { rates = c.rates; ratesDate = c.upd; return true; } } catch {}
+  try {
+    const r = await fetch('https://open.er-api.com/v6/latest/USD'); const j = await r.json();
+    if (j.result !== 'success') throw new Error(j.result);
+    rates = j.rates; ratesDate = new Date(j.time_last_update_unix*1000).toLocaleDateString('uk-UA');
+    ls.set('etsyRates', JSON.stringify({ day:today, rates, upd:ratesDate })); return true;
+  } catch { return false; }
+}
+// aggregate a money field: with a display currency → one converted number, otherwise per original currency
+function moneyAgg(orders, field='total') {
+  if (dispCur && rates) {
+    let v = 0, n = 0, miss = 0;
+    orders.forEach(o => { const x = o[field]; if (x == null) return; const c = conv(x, o.currency||'USD'); if (c == null) miss++; else { v += c; n++; } });
+    return { v, n, cur:dispCur, miss, by:null };
+  }
+  const by = {}; orders.forEach(o => { const x = o[field]; if (x != null) { const c = o.currency||'USD'; (by[c] ||= { v:0, n:0 }); by[c].v += x; by[c].n++; } });
+  const top = Object.entries(by).sort((a,b) => b[1].n - a[1].n)[0];
+  return { v: top ? top[1].v : 0, n: top ? top[1].n : 0, cur: top ? top[0] : 'USD', by, miss:0 };
+}
+function sumMoney(orders, compact=false, field='total') {
+  const a = moneyAgg(orders, field), f = compact ? fmtCompact : fmtMoney;
+  if (a.by) { const parts = Object.entries(a.by).sort((x,y) => y[1].v - x[1].v).map(([c,o]) => f(o.v, c)); return parts.length ? parts.join(' + ') : '—'; }
+  return a.n ? f(a.v, a.cur) + (a.miss ? '*' : '') : '—';
+}
+
+// ================= Etsy monthly statement (fees, ads, labels, refunds → expenses and net profit) =================
+// Shop Manager → Finances → Monthly statements → Download CSV: Date, Type, Title, Info, Currency, Amount, Fees & Taxes, Net
+const COST_CATS = { cogs:'Собівартість товарів', transaction:'Комісія за продаж', processing:'Обробка платежів', listing:'Розміщення лістингів', ads:'Реклама', labels:'Етикетки доставки', refund:'Повернення покупцям', tax:'Податки', other:'Інші збори Etsy' };
+const isStatement = rows => { const k = Object.keys(rows[0] || {}); return k.includes('type') && k.includes('net') && !k.includes('order id') && !k.includes('sale date'); };
+const numSigned = v => { const s = String(v ?? '').trim(); const n = num(s); return n == null ? null : (/^\(.*\)$/.test(s) && n > 0 ? -n : n); };
+function ledgerCat(type, title) {
+  const t = (type||'').toLowerCase(), s = (title||'').toLowerCase();
+  if (/deposit/.test(t)) return 'deposit'; // payout to the bank: not income or costs, but the base for income tax
+  if (/payment|transfer|payout/.test(t)) return null; // bills paid etc. — not income or costs
+  if (t === 'sale') return 'sale';
+  if (/refund/.test(t) || /refund/.test(s)) return 'refund';
+  if (/transaction fee/.test(s)) return 'transaction';
+  if (/processing fee/.test(s)) return 'processing';
+  if (/listing fee|renew/.test(s)) return 'listing';
+  if (/market/.test(t) || /\bads?\b|advertis|offsite/.test(s)) return 'ads';
+  if (/shipping/.test(t) || /label/.test(s)) return 'labels';
+  if (/tax|vat/.test(t)) return 'tax';
+  return 'other';
+}
+function parseLedger(rows) {
+  return rows.map(r => {
+    const type = pick(r, ['type']), title = pick(r, ['title','description']), info = pick(r, ['info']);
+    const t = Date.parse(pick(r, ['date']));
+    let net = numSigned(pick(r, ['net']));
+    if (net == null) { const a = numSigned(pick(r, ['amount'])), f = numSigned(pick(r, ['fees & taxes','fees and taxes'])); if (a != null || f != null) net = (a||0) + (f||0); }
+    if (/deposit/i.test(type)) { // the amount usually lives only in the title: "$1,234.56 sent to your bank account"
+      const m = String(title).match(/(\d[\d,]*(?:\.\d+)?)/);
+      net = net ? Math.abs(net) : m ? parseFloat(m[1].replace(/,/g, '')) : null;
+    }
+    return { date: isNaN(t) ? '' : new Date(t).toISOString(), type, title, info, net, currency: pick(r, ['currency']) || 'USD',
+      orderId: (info.match(/order\s*#?\s*(\d+)/i) || title.match(/order\s*#?\s*(\d+)/i) || [])[1] || '', cat: ledgerCat(type, title) };
+  }).filter(x => x.date && x.net != null && x.cat);
+}
+// statement rows of visible shops inside the period; with other filters only fees tied to visible orders count
+function ledgerEntries(b = rangeBounds()) {
+  const other = filt.q || filt.countries.size || filt.repeat || filt.item;
+  const ids = other ? new Set(visibleEntries(b).flatMap(e => e.orders.map(o => o.id))) : null;
+  return shops.filter(s => s.visible).flatMap(s => (s.ledger || []).filter(r => {
+    if (r.cat === 'deposit') return false;
+    const t = Date.parse(r.date); if (b && !(t >= b[0] && t < b[1])) return false;
+    return !ids || (r.orderId && ids.has(r.orderId));
+  }));
+}
+// unit costs the seller entered per listing (Гроші → Собівартість), kept per shop
+const unitCost = (shop, it) => { const v = shop.costs?.[itemKey(it)]; return typeof v === 'number' && v >= 0 ? v : null; };
+function cogsRows(entries) {
+  const out = [];
+  entries.forEach(e => e.orders.forEach(o => itemsOf(o).forEach(it => { const c = unitCost(e.shop, it); if (c != null) out.push({ currency:o.currency || 'USD', v:c * (it.q || 1) }); })));
+  return out;
+}
+function financeOf(b) {
+  const rows = ledgerEntries(b), cogs = viewOnly ? [] : cogsRows(visibleEntries(b));
+  return { rows, cogs,
+    cost: moneyAgg([...rows.filter(r => r.cat !== 'sale').map(r => ({ currency:r.currency, v:-r.net })), ...cogs], 'v'),
+    profit: moneyAgg([...rows.map(r => ({ currency:r.currency, v:r.net })), ...cogs.map(c => ({ currency:c.currency, v:-c.v }))], 'v') };
+}
+const fmtAgg = a => a.n ? fmtMoney(a.v, a.cur) + (a.miss ? '*' : '') : '—';
+const hasLedger = () => shops.some(s => s.visible && s.ledger?.length);
+const STATEMENT_HINT = 'Завантажте виписку Etsy: Shop Manager → Finances → Monthly statements → Download CSV';
+function updateFinanceKPIs(cb) {
+  const put = (id, a) => { const full = fmtAgg(a); $(id).textContent = full.length > 11 && a.n ? fmtCompact(a.v, a.cur) : full; $(id).title = full; };
+  if (!hasLedger()) { ['kCosts','kProfit'].forEach(id => { $(id).textContent = '—'; $(id).title = STATEMENT_HINT; $(id).classList.remove('neg', 'pos'); }); showDelta('dCosts', null); showDelta('dProfit', null); return; }
+  const f = financeOf(rangeBounds());
+  put('kCosts', f.cost); put('kProfit', f.profit);
+  const spent = !!f.cost.n && f.cost.v > 0;
+  $('kCosts').classList.toggle('neg', spent);
+  if (spent) { $('kCosts').textContent = '-' + $('kCosts').textContent; $('kCosts').title = '-' + $('kCosts').title; }
+  const gain = !!f.profit.n && f.profit.v > 0;
+  $('kProfit').classList.toggle('neg', !!f.profit.n && f.profit.v < 0); $('kProfit').classList.toggle('pos', gain);
+  if (gain) { $('kProfit').textContent = '+' + $('kProfit').textContent; $('kProfit').title = '+' + $('kProfit').title; }
+  if (cb) {
+    const p = financeOf(cb), lbl = 'Порівняно з ' + boundsLabel(cb);
+    const inv = d => d && { ...d, c: d.c === 'up' ? 'down' : d.c === 'down' ? 'up' : d.c }; // more costs = bad
+    showDelta('dCosts', f.cost.cur === p.cost.cur || !p.cost.n ? inv(pctDelta(f.cost.v, p.cost.n ? p.cost.v : 0)) : null, `${lbl}: ${fmtAgg(p.cost)}`);
+    showDelta('dProfit', f.profit.cur === p.profit.cur || !p.profit.n ? pctDelta(f.profit.v, p.profit.n ? p.profit.v : 0) : null, `${lbl}: ${fmtAgg(p.profit)}`);
+  } else { showDelta('dCosts', null); showDelta('dProfit', null); }
+}
+async function loadLedger(shop, rows) {
+  const items = parseLedger(rows);
+  if (!items.length) return toast('У виписці не знайдено рядків із сумами. Це точно CSV з Finances → Monthly statements?', 6000);
+  // identical rows can be legitimate (e.g. two $0.20 listing fees), so dedupe by count, not by presence
+  const key = r => [r.date, r.type, r.title, r.info, r.net].join('|'), have = new Map();
+  shop.ledger ||= []; shop.ledger.forEach(r => have.set(key(r), (have.get(key(r))||0) + 1));
+  const seen = new Map(); let added = 0, dup = 0;
+  for (const r of items) { const k = key(r), n = (seen.get(k)||0) + 1; seen.set(k, n); if (n <= (have.get(k)||0)) dup++; else { shop.ledger.push(r); added++; } }
+  shop.visible = true;
+  if (!await kv.set('ledger:'+shop.id, shop.ledger)) toast('Не вдалося зберегти виписку в браузері.', 5000);
+  const dates = items.map(r => Date.parse(r.date)).sort((a,b) => a-b);
+  renderShops(); refresh(false);
+  toast(`«${shop.name}»: виписка ${fmtDay(new Date(dates[0]))} — ${fmtDay(new Date(dates[dates.length-1]))}, +${added} рядків${dup ? `, ${dup} дублів пропущено` : ''}.`, 6000);
+}
+
+// ================= geocoding (Nominatim, one request per second, cached) =================
+let cache = {};
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+let geoChain = Promise.resolve();
+function geocode(p) {
+  const q = [p.city, p.state, p.country].filter(Boolean).join(', ');
+  if (cache[q] !== undefined) return Promise.resolve(cache[q]);
+  const job = geoChain.then(async () => {
+    if (cache[q] !== undefined) return cache[q];
+    await sleep(1100);
+    try { const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q)); const j = await r.json(); cache[q] = j[0] ? [+j[0].lat, +j[0].lon] : null; } catch { return null; }
+    kv.set('geo', cache); return cache[q];
+  });
+  geoChain = job.catch(()=>{});
+  return job;
+}
+
+// ================= filters =================
+const filt = { q:'', countries:new Set(), range:'all', from:'', to:'', repeat:false, item:null, cmp: ls.get('etsyCmp') === 'yoy' ? 'yoy' : 'prev' };
+let privacy = ls.get('etsyPrivacy') === '1';
+const RANGES = [['all','Увесь час'],['today','Сьогодні'],['yesterday','Вчора'],['week','Цей тиждень'],['month','Цей місяць'],['quarter','Цей квартал'],['year','Цей рік'],['custom','Свій період']];
+const parseDay = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const fmtDay = d => d.toLocaleDateString('uk-UA');
+function rangeBounds() { // [startMs, endMs) or null for "all time"; weeks start on Monday
+  const k = filt.range; if (k==='all') return null;
+  const n = new Date(), y = n.getFullYear(), m = n.getMonth(), today = new Date(y, m, n.getDate()), day = 864e5;
+  let s, e;
+  if (k==='today') { s = today; e = new Date(+today + day); }
+  else if (k==='yesterday') { s = new Date(+today - day); e = today; }
+  else if (k==='week') { s = new Date(y, m, n.getDate() - (n.getDay()+6)%7); e = new Date(s.getFullYear(), s.getMonth(), s.getDate()+7); }
+  else if (k==='month') { s = new Date(y, m, 1); e = new Date(y, m+1, 1); }
+  else if (k==='quarter') { const qm = Math.floor(m/3)*3; s = new Date(y, qm, 1); e = new Date(y, qm+3, 1); }
+  else if (k==='year') { s = new Date(y, 0, 1); e = new Date(y+1, 0, 1); }
+  else { s = filt.from ? parseDay(filt.from) : new Date(-8.64e15); e = filt.to ? new Date(+parseDay(filt.to) + day) : new Date(8.64e15); }
+  return [+s, +e];
+}
+// the period to compare with: same elapsed length of the previous period, or the same dates a year earlier
+function compareBounds() {
+  const b = rangeBounds(); if (!b || b[0] < -8e15 || b[1] > 8e15) return null;
+  const s = new Date(b[0]), elapsed = Math.min(Date.now(), b[1]) - b[0]; if (elapsed <= 0) return null;
+  let ps;
+  if (filt.cmp === 'yoy') ps = new Date(s.getFullYear()-1, s.getMonth(), s.getDate());
+  else if (filt.range === 'month') ps = new Date(s.getFullYear(), s.getMonth()-1, 1);
+  else if (filt.range === 'quarter') ps = new Date(s.getFullYear(), s.getMonth()-3, 1);
+  else if (filt.range === 'year') ps = new Date(s.getFullYear()-1, 0, 1);
+  else ps = new Date(b[0] - (b[1] - b[0]));
+  return [+ps, +ps + elapsed];
+}
+const boundsLabel = b => !b ? 'Увесь час' : (b[0] > -8e15 ? fmtDay(new Date(b[0])) : '…') + ' — ' + (b[1] < 8e15 ? fmtDay(new Date(b[1]-1)) : '…');
+const rangeLabel = () => boundsLabel(rangeBounds());
+function ordersFiltered(orders, b = rangeBounds()) {
+  return orders.filter(o => {
+    if (filt.repeat && !(o.of > 1)) return false;
+    if (filt.item && !itemsOf(o).some(it => itemKey(it) === filt.item.k)) return false;
+    if (!b) return true;
+    const t = Date.parse(o.date); return !isNaN(t) && t >= b[0] && t < b[1];
+  });
+}
+// flat list of {shop, place, orders} that pass all filters; pass null to ignore the date range
+function visibleEntries(b = rangeBounds()) {
+  const q = filt.q.trim().toLowerCase(), out = [];
+  for (const shop of shops) { if (!shop.visible) continue;
+    for (const place of shop.places) {
+      if (place.lat == null) continue;
+      const orders = ordersFiltered(place.orders, b);
+      if (!orders.length) continue;
+      if (filt.countries.size && !filt.countries.has(place.country)) continue;
+      if (q && ![place.city, place.state, stateName(place.state), place.country, ...(privacy ? [] : orders.map(o=>o.buyer))].join(' ').toLowerCase().includes(q)) continue;
+      out.push({ shop, place, orders });
+    } }
+  return out;
+}
+function setRange(k, from='', to='') {
+  filt.range = k; if (k==='custom') { filt.from = from; filt.to = to; }
+  renderRangeUI(); refresh(true);
+}
+function renderRangeUI() {
+  const box = $('rangeChips'); box.innerHTML = '';
+  RANGES.forEach(([k,label]) => { const b = document.createElement('button'); b.className = 'chip'+(filt.range===k?' on':''); b.textContent = label;
+    b.onclick = () => {
+      stopPlay();
+      if (k==='custom' && !filt.from && !filt.to) { const n = new Date(); return setRange('custom', isoDay(new Date(n.getFullYear(), n.getMonth(), 1)), isoDay(n)); }
+      setRange(k, filt.from, filt.to);
+    };
+    box.appendChild(b); });
+  $('customRange').style.display = filt.range==='custom' ? 'flex' : 'none';
+  $('dFrom').value = filt.from; $('dTo').value = filt.to;
+  $('rangeNote').textContent = filt.range==='all' ? '' : rangeLabel();
+  const cb = $('cmpChips'); cb.innerHTML = '';
+  [['prev','Попереднім періодом','Такий самий відрізок часу безпосередньо перед обраним періодом'],['yoy','Тим самим торік','Ті самі дати рік тому']].forEach(([k,l,t]) => { const b = document.createElement('button'); b.className = 'chip'+(filt.cmp===k?' on':''); b.textContent = l; b.title = t; b.onclick = () => { filt.cmp = k; ls.set('etsyCmp', k); renderRangeUI(); redraw(false); }; cb.appendChild(b); });
+  const c = compareBounds();
+  if (!c) cb.insertAdjacentHTML('beforeend', '<div class="hint" style="width:100%">Оберіть період — біля цифр з\'явиться зміна у %.</div>');
+  else cb.insertAdjacentHTML('beforeend', `<div class="hint" style="width:100%">Порівнюємо з ${esc(boundsLabel(c))}</div>`);
+}
+$('dFrom').onchange = e => { stopPlay(); setRange('custom', e.target.value, filt.to); };
+$('dTo').onchange = e => { stopPlay(); setRange('custom', filt.from, e.target.value); };
+$('repeatChip').onclick = () => { filt.repeat = !filt.repeat; refresh(true); };
+function setItemFilter(it) { filt.item = it ? { k:itemKey(it), t:it.t || 'Лістинг' } : null; refresh(true); }
+function renderCurUI() {
+  const box = $('curChips'); box.innerHTML = '';
+  CURS.forEach(([c,l]) => { const b = document.createElement('button'); b.className = 'chip'+(dispCur===c?' on':''); b.textContent = l;
+    b.onclick = async () => {
+      dispCur = c; ls.set('etsyCur', c); renderCurUI();
+      if (c && !rates) { $('curNote').textContent = 'Завантажую курси…'; if (!await loadRates()) { toast('Не вдалося отримати курси валют. Перевірте інтернет.', 4000); dispCur = ''; ls.set('etsyCur',''); renderCurUI(); } }
+      refresh(false);
+    };
+    box.appendChild(b); });
+  $('curNote').textContent = dispCur && rates ? `За курсом на ${ratesDate} (не на дату замовлення). Окремі замовлення показані в оригінальній валюті.` : '';
+}
+
+function buildFilterUI() {
+  const byC = new Map();
+  shops.filter(s=>s.visible).forEach(s => s.places.forEach(p => { if (p.lat==null) return; const n = ordersFiltered(p.orders).length; if (n) byC.set(p.country||'—', (byC.get(p.country||'—')||0)+n); }));
+  filt.countries.forEach(c => { if (!byC.has(c)) byC.set(c, 0); });
+  const box = $('countryChips'); box.innerHTML='';
+  if (!byC.size) box.innerHTML = '<span class="hint">Немає замовлень для цих фільтрів</span>';
+  [...byC].sort((a,b)=>b[1]-a[1]).forEach(([c,n]) => { const b=document.createElement('button'); b.className='chip'+(filt.countries.has(c)?' on':''); b.innerHTML=`${esc(c)}<small>${n}</small>`; b.onclick=()=>{ filt.countries.has(c)?filt.countries.delete(c):filt.countries.add(c); refresh(true); }; box.appendChild(b); });
+  $('repeatChip').classList.toggle('on', filt.repeat);
+  $('itemFilter').innerHTML = filt.item
+    ? `<button class="chip on" id="itemChip" title="Прибрати фільтр">✕ ${esc(filt.item.t)}</button>`
+    : '<span class="hint">Оберіть товар у 📊 Статистика → Товари, щоб побачити, де саме його купують.</span>';
+  if ($('itemChip')) $('itemChip').onclick = () => setItemFilter(null);
+}
+$('q').oninput = e => { filt.q=e.target.value; refresh(true); };
+$('reset').onclick = () => { stopPlay(); Object.assign(filt, { q:'', range:'all', from:'', to:'', repeat:false, item:null }); filt.countries.clear(); $('q').value=''; renderRangeUI(); refresh(true); };
+$('fit').onclick = () => redraw(true);
+$('toggleFilters').onclick = () => $('filtersCard').classList.toggle('open');
+
+// ================= US states (Census 2020, millions) =================
+const US = { AL:['Alabama',5.02],AK:['Alaska',.733],AZ:['Arizona',7.15],AR:['Arkansas',3.01],CA:['California',39.54],CO:['Colorado',5.77],CT:['Connecticut',3.61],DE:['Delaware',.99],DC:['District of Columbia',.69],FL:['Florida',21.54],GA:['Georgia',10.71],HI:['Hawaii',1.46],ID:['Idaho',1.84],IL:['Illinois',12.81],IN:['Indiana',6.79],IA:['Iowa',3.19],KS:['Kansas',2.94],KY:['Kentucky',4.51],LA:['Louisiana',4.66],ME:['Maine',1.36],MD:['Maryland',6.18],MA:['Massachusetts',7.03],MI:['Michigan',10.08],MN:['Minnesota',5.71],MS:['Mississippi',2.96],MO:['Missouri',6.15],MT:['Montana',1.08],NE:['Nebraska',1.96],NV:['Nevada',3.10],NH:['New Hampshire',1.38],NJ:['New Jersey',9.29],NM:['New Mexico',2.12],NY:['New York',20.20],NC:['North Carolina',10.44],ND:['North Dakota',.78],OH:['Ohio',11.80],OK:['Oklahoma',3.96],OR:['Oregon',4.24],PA:['Pennsylvania',13.00],RI:['Rhode Island',1.10],SC:['South Carolina',5.12],SD:['South Dakota',.89],TN:['Tennessee',6.91],TX:['Texas',29.15],UT:['Utah',3.27],VT:['Vermont',.64],VA:['Virginia',8.63],WA:['Washington',7.71],WV:['West Virginia',1.79],WI:['Wisconsin',5.89],WY:['Wyoming',.58] };
+const US_BY_NAME = Object.fromEntries(Object.entries(US).map(([k,[n]]) => [n.toLowerCase(), k]));
+const stateCode = s => { s = String(s||'').trim(); if (US[s.toUpperCase()]) return s.toUpperCase(); return US_BY_NAME[s.toLowerCase()] || ''; };
+const stateName = s => { const c = stateCode(s); return c ? US[c][0] : ''; };
+const isUS = c => c === 'United States';
+
+// ================= map layers: pins / groups / heat / regions + routes =================
+const pinLayer = L.layerGroup().addTo(map);
+const routeLayer = L.layerGroup().addTo(map);
+const regionLayer = L.layerGroup().addTo(map);
+const clusterLayer = L.markerClusterGroup({ showCoverageOnHover:false, spiderfyOnMaxZoom:true, disableClusteringAtZoom:9, maxClusterRadius:55, iconCreateFunction:clusterIcon });
+let heatLayer = null;
+let display = ['pins','groups','heat','regions'].includes(ls.get('etsyDisplay')) ? ls.get('etsyDisplay') : 'groups';
+let routesOn = ls.get('etsyRoutes') === '1';
+let selected = null, sheet = null; // sheet: 'place' | 'stats' | 'list'
+const KPI_TABS = ['orders','cities','countries','tx','costs','costs']; let listTab = 'orders';
+
+function pinIcon(count, sel, color, shiftX) {
+  const w = Math.round(Math.min(48, 28 + Math.sqrt(count)*4)), h = Math.round(w*1.5);
+  const label = count>1 ? `<text x="12" y="15.6" text-anchor="middle" font-size="${count>99?7.5:count>9?9:10.5}" font-weight="800" font-family="system-ui,-apple-system,sans-serif" fill="${color}">${count}</text>` : `<circle cx="12" cy="12" r="3.2" fill="${color}"/>`;
+  const gid = 'g'+color.slice(1);
+  return L.divIcon({ className:'pinwrap'+(sel?' sel':''), iconSize:[w,h], iconAnchor:[w/2 - shiftX, h],
+    html:`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 24 36" style="--c:${color}"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".78"/><stop offset="1" stop-color="${color}"/></linearGradient></defs><path d="M12 .8C5.8.8.8 5.8.8 12c0 8.6 11.2 23 11.2 23S23.2 20.6 23.2 12C23.2 5.8 18.2.8 12 .8z" fill="url(#${gid})" stroke="#fff" stroke-width="1.6"/><circle cx="12" cy="12" r="7.6" fill="#fff"/>${label}</svg>` });
+}
+// cluster = white disc with a ring split by shop share and the total number of orders
+function clusterIcon(cluster) {
+  const by = new Map(); let total = 0;
+  cluster.getAllChildMarkers().forEach(m => { total += m.options.orders; by.set(m.options.color, (by.get(m.options.color)||0) + m.options.orders); });
+  const size = Math.round(Math.min(70, 36 + Math.sqrt(total)*3)), r = 15.9155;
+  let off = 0;
+  const segs = [...by].map(([c,n]) => { const len = n/total*100; const s = `<circle cx="20" cy="20" r="${r}" fill="none" stroke="${c}" stroke-width="5.5" stroke-dasharray="${len} ${100-len}" stroke-dashoffset="${-off}" transform="rotate(-90 20 20)"/>`; off += len; return s; }).join('');
+  return L.divIcon({ className:'clusterwrap', iconSize:[size,size],
+    html:`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 40 40"><circle cx="20" cy="20" r="19" fill="${theme === 'dark' ? '#2b2927' : '#fff'}"/>${segs}<text x="20" y="24.2" text-anchor="middle" font-size="${total>999?9:total>99?10.5:12.5}" font-weight="800" font-family="system-ui,-apple-system,sans-serif" fill="${theme === 'dark' ? '#f4efe9' : '#1c1b1a'}">${total}</text></svg>` });
+}
+function originIcon(color) {
+  return L.divIcon({ className:'originwrap', iconSize:[34,34], iconAnchor:[17,17],
+    html:`<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34"><circle cx="17" cy="17" r="15.5" fill="${color}" stroke="#fff" stroke-width="2.5"/><path d="M10 17.5 17 11l7 6.5M12 16v7h4v-4h2v4h4v-7" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>` });
+}
+function arc(a, b) { // gently curved line between two [lat,lng] points, taking the short way around the globe
+  let [la1, lo1] = a, [la2, lo2] = b;
+  if (lo2 - lo1 > 180) lo2 -= 360; else if (lo1 - lo2 > 180) lo2 += 360;
+  const c = [(la1+la2)/2 - (lo2-lo1)*.16, (lo1+lo2)/2 + (la2-la1)*.16], pts = [];
+  for (let i = 0; i <= 28; i++) { const t = i/28, u = 1-t; pts.push([Math.max(-85, Math.min(85, u*u*la1 + 2*u*t*c[0] + t*t*la2)), u*u*lo1 + 2*u*t*c[1] + t*t*lo2]); }
+  return pts;
+}
+
+// ---- regions (choropleth): Natural Earth country and US state borders, loaded on first use ----
+const NE = 'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@v5.1.2/geojson/';
+let regionsGeo = null, regionsLoading = null;
+function loadRegions() {
+  return regionsLoading ||= Promise.all(['ne_110m_admin_0_countries','ne_110m_admin_1_states_provinces'].map(f => fetch(NE+f+'.geojson').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })))
+    .then(([c, s]) => (regionsGeo = { c, s })).catch(e => { regionsLoading = null; throw e; });
+}
+function heatColor(t) {
+  const a=[253,231,214], b=[241,100,30], c=[156,36,18], mix=(p,q,u)=>p.map((v,i)=>Math.round(v+(q[i]-v)*u));
+  return `rgb(${(t < .5 ? mix(a,b,t*2) : mix(b,c,(t-.5)*2)).join(',')})`;
+}
+function featureCountry(p) { // English country name for a Natural Earth feature, matching countryName()
+  const code = p.ISO_A2_EH && p.ISO_A2_EH !== '-99' ? p.ISO_A2_EH : p.ISO_A2;
+  return code && code !== '-99' ? countryName(code) : p.ADMIN;
+}
+let perCap = ls.get('etsyPerCap') === '1'; // colour US states by orders per 1M residents instead of raw counts
+$('perCapBtn').onclick = () => { perCap = !perCap; ls.set('etsyPerCap', perCap ? '1' : '0'); redraw(false); };
+function drawRegions(vis) {
+  const byCountry = new Map(), byState = new Map();
+  vis.forEach(e => { const n = e.orders.length; byCountry.set(e.place.country, (byCountry.get(e.place.country)||0) + n); if (isUS(e.place.country)) { const sc = stateCode(e.place.state); if (sc) byState.set(sc, (byState.get(sc)||0) + n); } });
+  const pc = perCap && byState.size > 0, stVal = sc => pc ? (byState.get(sc) || 0) / (US[sc]?.[1] || 1) : (byState.get(sc) || 0);
+  const max = Math.max(1, ...byCountry.values(), ...byState.values()), maxS = pc ? Math.max(.01, ...[...byState.keys()].map(stVal)) : max;
+  const scale = (n, mx) => pc && mx === maxS ? n / mx : Math.log(1+n) / Math.log(1+mx);
+  $('legendMax').textContent = pc ? maxS.toFixed(1) : max; $('legendMin').textContent = pc ? '0' : '1';
+  $('legendTitle').textContent = pc ? 'Замовлень на 1 млн жителів' : 'Замовлень у регіоні';
+  $('perCapBtn').style.display = byState.size ? '' : 'none'; $('perCapBtn').textContent = pc ? 'Кількість' : 'На 1 млн жителів';
+  $('legend').classList.add('show');
+  const dark = theme === 'dark', edge = dark ? '#1b1b1d' : '#fff', faint = dark ? 'rgba(255,255,255,.16)' : 'rgba(0,0,0,.18)';
+  const style = (n, mx = max) => n ? { fillColor:heatColor(scale(n, mx)), fillOpacity:.8, color:edge, weight:1 } : { fillOpacity:0, color:faint, weight:.6 };
+  L.geoJSON(regionsGeo.c, {
+    bubblingMouseEvents:false,
+    style: f => { const c = featureCountry(f.properties); return isUS(c) && byState.size ? { fillOpacity:0, color:faint, weight:.8 } : style(byCountry.get(c)||0); },
+    onEachFeature: (f, layer) => {
+      const c = featureCountry(f.properties), n = byCountry.get(c) || 0;
+      if (isUS(c) && byState.size) return;
+      layer.bindTooltip(`<b>${esc(c)}</b><br>${n} замовлень`, { sticky:true });
+      layer.on('click', ev => { L.DomEvent.stopPropagation(ev); if (n) { filt.countries = new Set([c]); refresh(true); } });
+    },
+  }).addTo(regionLayer);
+  if (byState.size) L.geoJSON(regionsGeo.s, {
+    bubblingMouseEvents:false,
+    style: f => style(stVal(f.properties.postal), maxS),
+    onEachFeature: (f, layer) => {
+      const sc = f.properties.postal, n = byState.get(sc) || 0, per = US[sc] ? n / US[sc][1] : 0;
+      layer.bindTooltip(`<b>${esc(f.properties.name)}</b><br>${n} замовлень${n ? ` · ${per.toFixed(1)} на 1 млн жителів` : ''}`, { sticky:true });
+      layer.on('click', ev => { L.DomEvent.stopPropagation(ev); map.fitBounds(layer.getBounds(), { maxZoom:6, padding:[40,40] }); });
+    },
+  }).addTo(regionLayer);
+}
+
+function pctDelta(cur, prev) {
+  if (!prev && !cur) return { t:'', c:'flat' };
+  if (!prev) return { t:'нове', c:'up' };
+  const p = Math.round((cur - prev) / Math.abs(prev) * 100);
+  return { t: (p > 0 ? '▲ ' : p < 0 ? '▼ ' : '') + Math.abs(p) + '%', c: p > 0 ? 'up' : p < 0 ? 'down' : 'flat' };
+}
+function absDelta(cur, prev) { const d = cur - prev; return { t: d > 0 ? '▲ ' + d : d < 0 ? '▼ ' + (-d) : '±0', c: d > 0 ? 'up' : d < 0 ? 'down' : 'flat' }; }
+function showDelta(id, d, title) { const el = $(id); el.className = d && d.t ? 'show ' + d.c : ''; el.textContent = d ? d.t : ''; el.title = title || ''; }
+
+function redraw(fit=false) {
+  pinLayer.clearLayers(); clusterLayer.clearLayers(); routeLayer.clearLayers(); regionLayer.clearLayers();
+  if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+  $('legend').classList.remove('show');
+  const vis = visibleEntries(), all = [];
+  $('toggleFilters').classList.toggle('active', !!(filt.q || filt.countries.size || filt.range!=='all' || filt.repeat || filt.item));
+  vis.forEach(e => all.push(...e.orders));
+  if (display === 'regions') {
+    if (regionsGeo) drawRegions(vis);
+    else { toast('Завантажую кордони країн і штатів…'); loadRegions().then(() => { toast(''); if (display === 'regions') redraw(false); }).catch(() => toast('Не вдалося завантажити кордони. Перевірте інтернет.', 4000)); }
+  } else {
+    const slots = new Map(); // pins of different shops in the same city are nudged apart
+    vis.forEach(e => { const k = e.place.lat.toFixed(2)+','+e.place.lng.toFixed(2); if (!slots.has(k)) slots.set(k, []); slots.get(k).push(e); });
+    const markers = [];
+    for (const e of vis) {
+      const n = e.orders.length, isSel = selected?.place === e.place;
+      if (display === 'heat') {
+        markers.push(L.circleMarker([e.place.lat, e.place.lng], { radius:isSel?7:4.5, color:'#fff', weight:1.5, fillColor:e.shop.color, fillOpacity:1, orders:n, bubblingMouseEvents:false })
+          .bindTooltip(`${esc(e.place.city||'—')}: ${n}`, { direction:'top' }).on('click', () => openPlace(e)));
+      } else {
+        const grp = slots.get(e.place.lat.toFixed(2)+','+e.place.lng.toFixed(2));
+        const shift = grp.length>1 ? (grp.indexOf(e) - (grp.length-1)/2) * 16 : 0;
+        markers.push(L.marker([e.place.lat, e.place.lng], { icon:pinIcon(n, isSel, e.shop.color, shift), title:`${e.shop.name}: ${e.place.city||''} — ${n}`, riseOnHover:true, orders:n, color:e.shop.color }).on('click', () => openPlace(e)));
+      }
+    }
+    if (display === 'groups') { clusterLayer.addLayers(markers); if (!map.hasLayer(clusterLayer)) map.addLayer(clusterLayer); }
+    else { if (map.hasLayer(clusterLayer)) map.removeLayer(clusterLayer); markers.forEach(m => m.addTo(pinLayer)); }
+    if (display === 'heat' && vis.length && L.heatLayer) {
+      const max = Math.max(...vis.map(e => e.orders.length));
+      heatLayer = L.heatLayer(vis.map(e => [e.place.lat, e.place.lng, e.orders.length]), { radius:30, blur:24, maxZoom:6, max: Math.max(1, max*.7), minOpacity:.35, gradient:{ .2:'#ffd9a0', .45:'#ffa94d', .7:'#f1641e', 1:'#b3261e' } }).addTo(map);
+      pinLayer.eachLayer(l => l.bringToFront());
+    }
+  }
+  if (display === 'regions' && map.hasLayer(clusterLayer)) map.removeLayer(clusterLayer);
+  if (routesOn) {
+    for (const s of shops) {
+      if (!s.visible || !s.origin) continue;
+      const o = [s.origin.lat, s.origin.lng], mine = vis.filter(e => e.shop === s);
+      mine.forEach(e => L.polyline(arc(o, [e.place.lat, e.place.lng]), { color:s.color, weight: Math.min(4, 1.2 + Math.log2(e.orders.length)*.7), opacity:.55, interactive:false }).addTo(routeLayer));
+      L.marker(o, { icon:originIcon(s.color), zIndexOffset:2000 }).bindTooltip(blurNames ? '🏠 Місто відправки' : `🏠 ${esc(s.name)}: ${esc(s.origin.q)}`, { direction:'top', className:'origin-tip', offset:[0,-14] }).addTo(routeLayer);
+    }
+  }
+  // KPIs (+ change against the comparison period)
+  const cities = new Set(vis.map(e => placeKey(e.place))).size, countries = new Set(vis.map(e => e.place.country)).size;
+  $('kOrders').textContent = all.length; $('kCities').textContent = cities; $('kCountries').textContent = countries;
+  const full = sumMoney(all); $('kRev').textContent = full.length > 11 ? sumMoney(all, true) : full; $('kRev').title = full;
+  const cb = compareBounds();
+  if (cb) {
+    const pv = visibleEntries(cb), pAll = pv.flatMap(e => e.orders), lbl = 'Порівняно з ' + boundsLabel(cb);
+    const ra = moneyAgg(all), rp = moneyAgg(pAll);
+    showDelta('dOrders', pctDelta(all.length, pAll.length), `${lbl}: ${pAll.length}`);
+    showDelta('dCities', absDelta(cities, new Set(pv.map(e => placeKey(e.place))).size), lbl);
+    showDelta('dCountries', absDelta(countries, new Set(pv.map(e => e.place.country)).size), lbl);
+    showDelta('dRev', ra.cur === rp.cur || !rp.n ? pctDelta(ra.v, rp.n ? rp.v : 0) : null, `${lbl}: ${sumMoney(pAll)}`);
+  } else ['dOrders','dCities','dCountries','dRev'].forEach(id => showDelta(id, null));
+  if (!viewOnly) updateFinanceKPIs(cb);
+  updateGoalBar();
+  if (fit && vis.length) {
+    const pts = vis.map(e => [e.place.lat, e.place.lng]);
+    if (routesOn) shops.forEach(s => { if (s.visible && s.origin) pts.push([s.origin.lat, s.origin.lng]); });
+    // keep pins clear of the floating panels, but never squeeze the map into a sliver on smaller screens
+    const W = map.getSize().x, H = map.getSize().y;
+    const left = isDesktop() && W > 900 ? 400 : 20, right = isDesktop() && sheet && W > 1150 ? 450 : 40;
+    const top = isDesktop() ? 60 : Math.min(H * .45, 330), bottom = isDesktop() ? 60 : 110;
+    map.fitBounds(L.latLngBounds(pts).pad(.2), { maxZoom:6, paddingTopLeft:[left, top], paddingBottomRight:[right, bottom] });
+  }
+}
+// rebuild everything that depends on data/filters
+function refresh(fit=false) {
+  buildFilterUI(); redraw(fit);
+  if (sheet === 'stats') renderStats();
+  else if (sheet === 'list') renderList();
+  else if (sheet === 'money') renderMoney();
+  else if (sheet === 'place' && selected) { const e = visibleEntries().find(x => x.place === selected.place); e ? openPlace(e, false) : closeSheet(); }
+}
+
+document.querySelectorAll('#modes button').forEach(b => {
+  b.classList.toggle('on', b.dataset.d === display);
+  b.onclick = () => { display = b.dataset.d; ls.set('etsyDisplay', display); document.querySelectorAll('#modes button').forEach(x => x.classList.toggle('on', x===b)); redraw(false); };
+});
+function syncTopButtons() {
+  $('routesBtn').innerHTML = ICON.route; $('routesBtn').classList.toggle('on', routesOn);
+  $('statsBtn').innerHTML = ICON.stats; $('statsBtn').classList.toggle('on', sheet === 'stats');
+  $('moneyBtn').innerHTML = ICON.wallet; $('moneyBtn').classList.toggle('on', sheet === 'money');
+  $('playTop').innerHTML = playTimer ? ICON.pause : ICON.play; $('playTop').classList.toggle('on', !!tl);
+  if ($('playBtn')) $('playBtn').textContent = playTimer ? '⏸ Пауза' : tl ? '▶ Продовжити' : '▶ Таймлапс на мапі';
+  $('privacyBtn').innerHTML = privacy ? ICON.lock : ICON.unlock; $('privacyBtn').classList.toggle('on', privacy);
+  $('privacyBtn').title = privacy ? 'Приватний режим увімкнено: імена покупців сховані' : 'Приватний режим: сховати імена покупців';
+  $('exportBtn').innerHTML = ICON.download;
+  $('toggleFilters').innerHTML = ICON.filter;
+  $('themeBtn').innerHTML = theme === 'dark' ? ICON.sun : ICON.moon;
+  $('themeBtn').title = theme === 'dark' ? 'Світла тема' : 'Темна тема';
+  document.querySelectorAll('#kpis .kpi').forEach((el, i) => el.classList.toggle('on', goalTile(i) ? sheet === 'money' && moneyTab === 'goal' : sheet === 'list' && listTab === KPI_TABS[i]));
+  $('q').placeholder = privacy ? 'Пошук міста, штату чи країни' : 'Пошук міста, країни чи покупця';
+}
+$('routesBtn').onclick = () => {
+  routesOn = !routesOn; ls.set('etsyRoutes', routesOn ? '1' : '0'); syncTopButtons(); redraw(false);
+  if (routesOn && !shops.some(s => s.visible && s.origin)) toast(viewOnly ? 'Автор мапи не вказав місто відправки.' : 'Вкажіть «Місто відправки» в налаштуваннях магазину (✎), щоб побачити маршрути.', 5000);
+};
+$('privacyBtn').onclick = () => { privacy = !privacy; ls.set('etsyPrivacy', privacy ? '1' : '0'); syncTopButtons(); refresh(false); toast(privacy ? '🔒 Імена покупців сховані — можна показувати мапу іншим.' : 'Імена покупців знову видно.', 3000); };
+$('statsBtn').onclick = () => sheet === 'stats' ? closeSheet() : openStats();
+$('moneyBtn').onclick = () => sheet === 'money' ? closeSheet() : openMoney();
+$('playTop').onclick = () => togglePlay();
+$('themeBtn').onclick = () => {
+  theme = theme === 'dark' ? 'light' : 'dark'; ls.set('etsyTheme2', theme);
+  document.documentElement.dataset.theme = theme; setBase(); syncTopButtons(); redraw(false);
+};
+$('exportBtn').onclick = e => { e.stopPropagation(); $('exportMenu').classList.toggle('open'); };
+document.addEventListener('click', e => { if (!e.target.closest('#exportWrap')) $('exportMenu').classList.remove('open'); });
+const menuAct = fn => () => { $('exportMenu').classList.remove('open'); fn(); };
+$('expPng').onclick = menuAct(() => exportPNG());
+$('expCsv').onclick = menuAct(() => exportCSV());
+$('expShare').onclick = menuAct(() => shareLink());
+$('expInstall').onclick = menuAct(() => installApp());
+$('expBackup').onclick = menuAct(() => exportBackup());
+$('expRestore').onclick = menuAct(() => $('restoreFile').click());
+
+// ================= right sheet: orders of one place =================
+function openSheet(kind, color) {
+  sheet = kind; const m = $('sheet'); m.style.setProperty('--c', color || 'var(--accent)'); m.classList.add('open'); syncTopButtons();
+}
+function closeSheet() {
+  if (!sheet) return; const wasSel = !!selected; $('sheet').dataset.kind = ''; $('sheet').style.minHeight = '';
+  sheet = null; selected = null; $('sheet').classList.remove('open'); syncTopButtons(); if (wasSel) redraw(false);
+}
+map.on('click', closeSheet);
+document.addEventListener('keydown', e => { if (e.key==='Escape') { closeSheet(); $('dlg').classList.remove('open'); $('exportMenu').classList.remove('open'); } });
+
+function openPlace(e, pan=true) {
+  pausePlay();
+  const changed = selected?.place !== e.place;
+  selected = e; const { shop, place:p } = e;
+  const sorted = [...e.orders].sort((a,b) => (Date.parse(b.date)||0) - (Date.parse(a.date)||0));
+  const dates = e.orders.map(o=>Date.parse(o.date)).filter(Boolean).sort((a,b)=>a-b);
+  const dist = shop.origin ? distKm([shop.origin.lat, shop.origin.lng], [p.lat, p.lng]) : null;
+  const rows = sorted.map(o => orderRow(o)).join('');
+  $('sheet').innerHTML = `
+    <div class="m-head"><div class="m-pin">📍</div>
+      <div style="flex:1;min-width:0"><div class="m-title">${esc(p.city||'Невідоме місто')}</div><div class="m-sub">${esc([p.state,p.country].filter(Boolean).join(', '))}${dist!=null ? ` · 📦 ~${fmtKm(dist)}` : ''}</div>
+        <div class="m-shop">${avatarHTML(shop)}${esc(shop.name)}</div></div>
+      <button class="ib" id="mClose" title="Закрити (Esc)">✕</button></div>
+    <div class="m-stats">
+      <div class="m-stat"><b>${e.orders.length}</b><span>Замовлень</span></div>
+      <div class="m-stat"><b title="${esc(sumMoney(e.orders))}">${esc(sumMoney(e.orders))}</b><span>Дохід</span></div>
+      <div class="m-stat"><b>${dates.length ? esc(new Date(dates[dates.length-1]).toLocaleDateString('uk-UA')) : '—'}</b><span>Останнє</span></div>
+    </div>
+    <div class="m-list"><div class="m-h">Замовлення з цього міста${filt.range!=='all' ? ' · '+esc(rangeLabel()) : ''}${filt.item ? ' · '+esc(filt.item.t) : ''}</div>${rows || '<div class="empty">Немає деталей замовлень</div>'}</div>`;
+  $('mClose').onclick = closeSheet;
+  openSheet('place', shop.color);
+  if (changed) redraw(false);
+  if (pan && isDesktop()) { const pt = map.latLngToContainerPoint([p.lat,p.lng]), W = map.getSize().x; if (pt.x > W-470) map.panBy([pt.x-(W-470), 0]); }
+}
+
+// ---- shared row builders ----
+const listingLink = it => { const t = esc(it.t || 'Лістинг'); return it.id ? `<a href="https://www.etsy.com/listing/${encodeURIComponent(it.id)}" target="_blank" rel="noopener noreferrer" title="Відкрити лістинг на Etsy">${t} ↗</a>` : t; };
+function priceHTML(v, cur) {
+  if (v == null) return '';
+  const cv = dispCur && rates && cur !== dispCur ? conv(v, cur) : null;
+  return esc(fmtMoney(v, cur)) + (cv != null ? `<small>≈ ${esc(fmtMoney(cv, dispCur))}</small>` : '');
+}
+// one order; with `place` the city is shown too (lists across many cities); `i` makes the row clickable
+function orderRow(o, place, i) {
+  const items = itemsOf(o);
+  const titles = items.length ? items.map(listingLink).join('<br>') : esc(o.itemsCount ? `${o.itemsCount} товар(ів)` : 'Замовлення');
+  const meta = [place ? '📍 ' + [place.city, place.country].filter(Boolean).join(', ') : '', !privacy && o.buyer ? '👤 '+o.buyer : '', fmtDate(o.date), o.id ? '#'+o.id : ''].filter(Boolean).map(esc).join(' · ');
+  const rep = o.of > 1 ? `<span class="badge" title="Повторний покупець">🔁 ${o.nth ? `${o.nth}-ге з ${o.of}` : 'повторний'}</span>` : '';
+  return `<div class="order"${i != null ? ` data-i="${i}" style="cursor:pointer"` : ''}><div class="ic">🛍️</div><div class="mid"><div class="tt">${titles}</div><div class="mm">${meta}${rep}</div></div><div class="pr">${priceHTML(o.total, o.currency)}</div></div>`;
+}
+const rankHTML = rows => rows.length ? rows.map((r,i) => `<div class="rk${r.on?' on':''}" data-i="${i}"><div class="bar" style="width:${r.share*100}%"></div><span class="no">${i+1}</span><span class="nm">${r.name}${r.sub ? `<small>${r.sub}</small>` : ''}</span><span class="vl">${r.val}${r.rev ? `<small>${esc(r.rev)}</small>` : ''}</span></div>`).join('') : '<div class="empty">Немає даних</div>';
+function focusEntry(e) { map.setView([e.place.lat, e.place.lng], Math.max(map.getZoom(), 7)); openPlace(e, false); }
+
+// ================= right sheet: details behind the KPI tiles =================
+const LIST_MAX = 300;
+const goalTile = i => i === 3 && !viewOnly && goal.amount > 0; // with a revenue goal the revenue tile opens Гроші → Ціль
+document.querySelectorAll('#kpis .kpi').forEach((el, i) => el.onclick = () => {
+  if (goalTile(i)) { if (sheet === 'money' && moneyTab === 'goal') return closeSheet(); moneyTab = 'goal'; ls.set('etsyMoneyTab', moneyTab); return sheet === 'money' ? renderMoney() : openMoney(); }
+  sheet === 'list' && listTab === KPI_TABS[i] ? closeSheet() : openList(KPI_TABS[i]);
+});
+function openList(tab) { pausePlay(); listTab = tab; if (selected) { selected = null; redraw(false); } openSheet('list'); renderList(); }
+function renderList() {
+  const vis = visibleEntries();
+  const orders = vis.flatMap(e => e.orders.map(o => ({ o, e }))).sort((a,b) => (Date.parse(b.o.date)||0) - (Date.parse(a.o.date)||0));
+  const tx = orders.flatMap(({ o, e }) => itemsOf(o).map(it => ({ it, o, e })));
+  const cityMap = new Map(); vis.forEach(e => { const k = placeKey(e.place); if (!cityMap.has(k)) cityMap.set(k, { e, orders:[] }); const c = cityMap.get(k); c.orders.push(...e.orders); if (e.orders.length > c.e.orders.length) c.e = e; });
+  const cities = [...cityMap.values()].sort((a,b) => b.orders.length - a.orders.length);
+  const ctryMap = new Map(); vis.forEach(e => { const k = e.place.country||'—'; if (!ctryMap.has(k)) ctryMap.set(k, { c:k, orders:[], cities:new Set() }); ctryMap.get(k).orders.push(...e.orders); ctryMap.get(k).cities.add(placeKey(e.place)); });
+  const countries = [...ctryMap.values()].sort((a,b) => b.orders.length - a.orders.length);
+  const ledgerRows = viewOnly ? [] : ledgerEntries().sort((a,b) => Date.parse(b.date) - Date.parse(a.date));
+  const TABS = [['orders','Замовлення',orders.length],['cities','Міста',cities.length],['countries','Країни',countries.length],['tx','Транзакції',tx.length], ...(viewOnly ? [] : [['costs','Витрати',ledgerRows.length]])];
+  let body = '', pick = () => {}, total = 0, note = '';
+  if (listTab === 'orders') {
+    total = orders.length; body = orders.slice(0, LIST_MAX).map((x, i) => orderRow(x.o, x.e.place, i)).join('');
+    pick = i => focusEntry(orders[i].e);
+  } else if (listTab === 'cities') {
+    total = cities.length; const mx = cities[0]?.orders.length || 1;
+    body = rankHTML(cities.slice(0, LIST_MAX).map(x => ({ name:esc(x.e.place.city||'—'), sub:esc([x.e.place.state, x.e.place.country].filter(Boolean).join(', ')), val:x.orders.length, rev:sumMoney(x.orders), share:x.orders.length/mx })));
+    pick = i => focusEntry(cities[i].e);
+  } else if (listTab === 'countries') {
+    total = countries.length; const mx = countries[0]?.orders.length || 1;
+    body = rankHTML(countries.map(x => ({ name:esc(x.c), sub:`${x.cities.size} міст`, val:x.orders.length, rev:sumMoney(x.orders), share:x.orders.length/mx, on:filt.countries.has(x.c) })));
+    pick = i => { filt.countries = new Set([countries[i].c]); refresh(true); };
+    note = 'Натисніть на країну, щоб показати на мапі лише її.';
+  } else if (listTab === 'costs') {
+    total = ledgerRows.length;
+    if (!hasLedger()) {
+      body = `<div class="empty" style="text-align:left;line-height:1.7">Комісії й витрати Etsy є у щомісячній виписці:<br>1. Shop Manager → <b>Finances</b> → <b>Monthly statements</b><br>2. Виберіть місяць → <b>Download CSV</b><br>3. Тут натисніть ⬆ біля магазину й виберіть цей файл.<br><br>Можна завантажити кілька місяців — дублі не з'являться.</div>`;
+    } else {
+      const f = financeOf(rangeBounds());
+      const byCat = new Map(); ledgerRows.filter(r => r.cat !== 'sale').forEach(r => { if (!byCat.has(r.cat)) byCat.set(r.cat, []); byCat.get(r.cat).push({ currency:r.currency, v:-r.net }); });
+      if (f.cogs.length) byCat.set('cogs', f.cogs);
+      const cats = [...byCat].map(([c, list]) => ({ c, a:moneyAgg(list, 'v') })).filter(x => Math.abs(x.a.v) >= .005).sort((a,b) => b.a.v - a.a.v);
+      const mx = Math.max(.01, ...cats.map(x => Math.abs(x.a.v)));
+      body = `<div class="st-grid" style="padding:0 6px 10px"><div class="m-stat"><b class="${f.cost.n && f.cost.v > 0 ? 'neg' : ''}">${f.cost.n && f.cost.v > 0 ? '-' : ''}${esc(fmtAgg(f.cost))}</b><span>Витрати</span></div><div class="m-stat"><b class="${f.profit.n && f.profit.v < 0 ? 'neg' : f.profit.n && f.profit.v > 0 ? 'pos' : ''}">${f.profit.n && f.profit.v > 0 ? '+' : ''}${esc(fmtAgg(f.profit))}</b><span>Чистий прибуток</span></div></div>`
+        + rankHTML(cats.map(x => ({ name:esc(COST_CATS[x.c] || x.c), val:esc(fmtMoney(x.a.v, x.a.cur)), share:Math.abs(x.a.v)/mx })))
+        + `<div class="m-h">Рядки виписки</div>`
+        + ledgerRows.slice(0, LIST_MAX).map(r => `<div class="order"><div class="ic">${r.cat === 'sale' ? '💰' : '🧾'}</div><div class="mid"><div class="tt">${esc(r.title || r.type)}</div><div class="mm">${esc([fmtDate(r.date), r.type, r.info].filter(Boolean).join(' · '))}</div></div><div class="pr${r.net < 0 ? ' neg' : r.net > 0 ? ' pos' : ''}">${r.net > 0 ? '+' : ''}${priceHTML(r.net, r.currency)}</div></div>`).join('');
+      note = 'З виписки Etsy. Прибуток = продажі мінус комісії, реклама, етикетки й повернення' + (f.cogs.length ? ' та собівартість товарів (💰 Гроші → Собівартість).' : '. Собівартість товарів можна додати в 💰 Гроші → Собівартість.')
+        + (filt.q || filt.countries.size || filt.repeat || filt.item ? ' З активними фільтрами враховано лише збори, пов\'язані з видимими замовленнями.' : '');
+    }
+  } else {
+    total = tx.length;
+    body = tx.slice(0, LIST_MAX).map(({ it, o, e }, i) => {
+      const linePrice = it.p != null ? it.p : (itemsOf(o).length === 1 ? o.total : null);
+      const meta = [fmtDate(o.date), [e.place.city, e.place.country].filter(Boolean).join(', '), o.id ? '#'+o.id : '', it.q > 1 ? `× ${it.q}` : ''].filter(Boolean).map(esc).join(' · ');
+      // discounted line: old price struck through, price actually paid, and the discount in %
+      // per-item discount if the file has it, otherwise the order's discount split by item price
+      const disc = linePaid(it, o).disc;
+      const price = disc
+        ? `<s class="old">${esc(fmtMoney(it.p, o.currency))}</s>${priceHTML(it.p - disc, o.currency)}<span class="disc">−${Math.round(disc / it.p * 100)}%</span>`
+        : priceHTML(linePrice, o.currency);
+      return `<div class="order" data-i="${i}" style="cursor:pointer"><div class="ic">🏷️</div><div class="mid"><div class="tt">${listingLink(it)}</div><div class="mm">${meta}</div></div><div class="pr">${price}</div></div>`;
+    }).join('');
+    pick = i => focusEntry(tx[i].e);
+    note = tx.length ? 'Кожен проданий товар окремим рядком.' : (viewOnly ? 'Товари не передаються в посиланні для перегляду.' : 'Транзакції беруться з файлу «Sold Order Items».');
+  }
+  if (!body) body = '<div class="empty">Немає даних для цих фільтрів</div>';
+  if (total > LIST_MAX) note = `Показано перші ${LIST_MAX} з ${total}. Звузьте період або країни, щоб побачити решту.` + (note ? ' ' + note : '');
+  $('sheet').innerHTML = `
+    <div class="m-head"><div class="m-pin">📋</div>
+      <div style="flex:1;min-width:0"><div class="m-title">Деталі</div><div class="m-sub">${esc(rangeLabel())} · ${esc(sumMoney(orders.map(x => x.o)))}${filt.item ? ' · '+esc(filt.item.t) : ''}</div></div>
+      <button class="ib" id="mClose" title="Закрити (Esc)">✕</button></div>
+    <div style="padding:0 16px;flex:none"><div class="tabs" style="margin:0 0 6px">${TABS.map(([k,l,n]) => `<button data-t="${k}" class="${listTab===k?'on':''}">${l} <small style="opacity:.6">${n}</small></button>`).join('')}</div>
+      ${note ? `<div class="tab-note">${note}</div>` : ''}</div>
+    <div class="m-list" id="lsList" style="padding-top:8px"><div class="rk-list">${body}</div></div>`;
+  $('mClose').onclick = closeSheet;
+  $('sheet').querySelectorAll('.tabs button').forEach(b => b.onclick = () => { listTab = b.dataset.t; renderList(); syncTopButtons(); });
+  $('lsList').onclick = ev => { if (ev.target.closest('a')) return; const r = ev.target.closest('[data-i]'); if (r) pick(+r.dataset.i); };
+}
+
+// ================= right sheet: statistics =================
+let statsTab = 'cities', playTimer = null;
+const MONTHS = ['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'];
+const DOW = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
+const YEAR_COLORS = ['#f1641e','#2f80ed','#a5a09a'];
+const monthKey = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
+const monthLabel = k => { const [y,m] = k.split('-'); return `${MONTHS[+m-1]} ${y}`; };
+function monthsOf(entries) {
+  const counts = new Map(); let min = Infinity, max = -Infinity;
+  entries.forEach(e => e.orders.forEach(o => { const t = Date.parse(o.date); if (isNaN(t)) return; const k = monthKey(t); counts.set(k, (counts.get(k)||0)+1); min = Math.min(min, t); max = Math.max(max, t); }));
+  if (!counts.size) return [];
+  const out = [], d = new Date(new Date(min).getFullYear(), new Date(min).getMonth(), 1), end = new Date(max);
+  while (d <= end) { const k = monthKey(+d); out.push({ k, n: counts.get(k)||0 }); d.setMonth(d.getMonth()+1); }
+  return out.slice(-48);
+}
+const monthEnd = k => { const [y,m] = k.split('-').map(Number); return isoDay(new Date(y, m, 0)); };
+// timelapse player: orders appear day by day (default 1 day per second); pause keeps the current day,
+// the slider / mouse wheel / ← → move between days, ✕ closes and brings back the previous period
+const TL_SPEEDS = [[.5,'½ дня/с'],[1,'1 день/с'],[2,'2 дні/с'],[5,'5 днів/с'],[10,'10 днів/с'],[30,'30 днів/с']];
+let playSaved = null, tl = null, tlSpeed = TL_SPEEDS.some(x => x[0] === +ls.get('etsyTlSpeed')) ? +ls.get('etsyTlSpeed') : 1;
+$('tlSpeed').innerHTML = TL_SPEEDS.map(([v,l]) => `<option value="${v}"${v === tlSpeed ? ' selected' : ''}>${l}</option>`).join('');
+function tlShow(i) {
+  if (!tl) return;
+  tl.i = Math.max(0, Math.min(tl.days - 1, i));
+  const s = tl.start, day = new Date(s.getFullYear(), s.getMonth(), s.getDate() + tl.i);
+  filt.range = 'custom'; filt.from = isoDay(s); filt.to = isoDay(day);
+  renderRangeUI(); buildFilterUI(); redraw(false);
+  const endMs = +new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+  $('tlDate').textContent = day.toLocaleDateString('uk-UA', { day:'numeric', month:'long', year:'numeric' });
+  $('tlCount').textContent = `${tl.ts.filter(t => t < endMs).length} замовлень`;
+  $('tlRange').value = tl.i;
+  if (sheet === 'stats') { const mk = monthKey(+day); if (mk !== tl.mk) { tl.mk = mk; renderStats(mk); } }
+  else if (sheet === 'list') renderList();
+  else if (sheet === 'money') renderMoney();
+}
+function syncPlay() {
+  $('tlPlay').innerHTML = playTimer ? ICON.pause : ICON.play;
+  $('tlPlay').title = playTimer ? 'Пауза (пробіл)' : 'Відтворити (пробіл)';
+  syncTopButtons();
+}
+function pausePlay() { if (!playTimer) return; clearInterval(playTimer); playTimer = null; syncPlay(); }
+function resumePlay() {
+  if (!tl) return play();
+  if (tl.i >= tl.days - 1) tlShow(0); // at the end: start over
+  clearInterval(playTimer);
+  playTimer = setInterval(() => { tlShow(tl.i + 1); if (tl.i >= tl.days - 1) pausePlay(); }, 1000 / tlSpeed);
+  syncPlay();
+}
+const togglePlay = () => !tl ? play() : playTimer ? pausePlay() : resumePlay();
+function stopPlay(restore = true) {
+  if (!tl) return;
+  clearInterval(playTimer); playTimer = null; tl = null;
+  $('tlBox').classList.remove('show'); syncPlay();
+  const s = playSaved; playSaved = null;
+  if (restore && s) { Object.assign(filt, s); renderRangeUI(); refresh(false); }
+  else if (sheet === 'stats') renderStats();
+}
+function play() {
+  const ts = visibleEntries(null).flatMap(e => e.orders).map(o => Date.parse(o.date)).filter(t => !isNaN(t)).sort((a,b) => a-b);
+  if (!ts.length) return toast('Немає дат замовлень для таймлапсу.', 3000);
+  stopPlay();
+  playSaved = { range:filt.range, from:filt.from, to:filt.to };
+  const f = new Date(ts[0]), l = new Date(ts[ts.length-1]), start = new Date(f.getFullYear(), f.getMonth(), f.getDate());
+  const days = Math.round((+new Date(l.getFullYear(), l.getMonth(), l.getDate()) - start) / 864e5) + 1;
+  tl = { start, days, ts, i:0, mk:'' };
+  $('tlRange').max = days - 1; $('tlBox').classList.add('show');
+  filt.range = 'all'; buildFilterUI(); redraw(true); // frame every pin first, then grow from day one
+  tlShow(0); resumePlay();
+}
+$('tlPlay').onclick = () => togglePlay();
+$('tlPrev').onclick = () => { pausePlay(); tlShow(tl.i - 1); };
+$('tlNext').onclick = () => { pausePlay(); tlShow(tl.i + 1); };
+$('tlStop').onclick = () => stopPlay();
+$('tlRange').oninput = e => { pausePlay(); tlShow(+e.target.value); };
+$('tlSpeed').onchange = e => { tlSpeed = +e.target.value; ls.set('etsyTlSpeed', String(tlSpeed)); if (playTimer) resumePlay(); };
+let tlWheel = 0; // trackpads send many small deltas: one day per ~40px
+$('tlBox').addEventListener('wheel', e => {
+  if (!tl) return; e.preventDefault();
+  tlWheel += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  const step = Math.trunc(tlWheel / 40); if (!step) return;
+  tlWheel -= step * 40; pausePlay(); tlShow(tl.i + step);
+}, { passive:false });
+document.addEventListener('keydown', e => {
+  if (!tl || e.target.closest?.('input:not([type=range]), textarea, select')) return;
+  if (e.key === ' ' && e.target.closest?.('button')) return; // a focused button already reacts to space
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); pausePlay(); tlShow(tl.i + (e.key === 'ArrowRight' ? 1 : -1)); }
+  else if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+// seasonality over all time (date filter ignored): weekday bars + month-of-year bars for the last 3 years
+function seasonHTML(entries) {
+  const dow = Array(7).fill(0), years = new Map();
+  entries.forEach(e => e.orders.forEach(o => { const t = Date.parse(o.date); if (isNaN(t)) return; const d = new Date(t); dow[(d.getDay()+6)%7]++; const y = d.getFullYear(); if (!years.has(y)) years.set(y, Array(12).fill(0)); years.get(y)[d.getMonth()]++; }));
+  if (!years.size) return '';
+  const mx = Math.max(1, ...dow), top = dow.indexOf(Math.max(...dow));
+  const ys = [...years.keys()].sort((a,b) => b-a).slice(0,3), my = Math.max(1, ...ys.flatMap(y => years.get(y)));
+  return `
+    <div class="chart"><div class="lbl" style="margin:0 0 6px">Дні тижня · найбільше в ${DOW[top].toLowerCase()}</div>
+      <div class="bars" style="height:56px;gap:6px">${dow.map((n,i) => `<div class="${i===top?'in':''}" style="height:${Math.max(3, n/mx*100)}%" title="${DOW[i]}: ${n}"></div>`).join('')}</div>
+      <div class="axis eq">${DOW.map(d => `<span>${d}</span>`).join('')}</div></div>
+    <div class="chart"><div class="lbl" style="margin:0 0 6px">Місяці за роками</div>
+      <div class="grp">${MONTHS.map((m,mi) => `<div>${ys.slice().reverse().map(y => { const n = years.get(y)[mi]; return `<i style="height:${n ? Math.max(4, n/my*100) : 1}%;background:${YEAR_COLORS[ys.indexOf(y)]}" title="${m} ${y}: ${n}"></i>`; }).join('')}</div>`).join('')}</div>
+      <div class="axis eq">${MONTHS.map(m => `<span>${m[0].toUpperCase()}</span>`).join('')}</div>
+      <div class="lgd">${ys.map((y,i) => `<span><b style="background:${YEAR_COLORS[i]}"></b>${y}</span>`).join('')}</div></div>`;
+}
+
+// GitHub-style calendar of the selected period (date filter); "all time" = first order … today
+function calendarHTML(entries) {
+  const counts = new Map(); let first = Infinity, last = -Infinity;
+  entries.forEach(e => e.orders.forEach(o => { const t = Date.parse(o.date); if (isNaN(t)) return; const k = isoDay(new Date(t)); counts.set(k, (counts.get(k)||0) + 1); first = Math.min(first, t); last = Math.max(last, t); }));
+  if (!counts.size) return '';
+  const day0 = t => { const d = new Date(t); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
+  const b = rangeBounds(), now = Date.now();
+  let from = day0(b && b[0] > -8e15 ? b[0] : first), to = day0(b && b[1] < 8e15 ? b[1] - 1 : Math.max(now, last));
+  if (to - from > 731 * 864e5) from = new Date(to.getFullYear() - 2, to.getMonth(), to.getDate() + 1); // at most 2 years, or the cells get too small
+  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate() - (from.getDay()+6)%7); // Monday of the first week
+  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate() + (7 - (to.getDay()+6)%7) - 1); // Sunday of the last week
+  const cells = []; let mx = 1, active = 0, best = null;
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
+    const k = isoDay(d), inside = d >= from && d <= to, c = inside ? counts.get(k) || 0 : 0;
+    if (c) { active++; if (!best || c > best[1]) best = [k, c]; mx = Math.max(mx, c); }
+    cells.push([k, c, inside]);
+  }
+  const weeks = cells.length / 7, lvl = c => !c ? 0 : Math.min(4, Math.ceil(c / mx * 4));
+  const label = d => d.toLocaleDateString('uk-UA', { day:'numeric', month:'short', year:'numeric' });
+  return `<div class="chart"><div class="lbl" style="margin:0 0 6px">Календар продажів · ${active} дн. з продажами${best ? ` · рекорд ${best[1]} (${fmtDay(parseDay(best[0]))})` : ''}</div>
+    <div class="cal" id="calGrid" style="grid-auto-columns:${weeks <= 10 ? '24px' : weeks < 26 ? '15px' : 'minmax(0,1fr)'}${weeks <= 10 ? ';gap:3px' : ''}">${cells.map(([k,c,inside]) => inside
+      ? `<i class="l${lvl(c)}" data-d="${k}" data-tip="${esc(parseDay(k).toLocaleDateString('uk-UA', { weekday:'short', day:'numeric', month:'short', year:'numeric' }))} · ${c ? c + ' зам.' : 'без замовлень'}"></i>`
+      : '<i class="out"></i>').join('')}</div>
+    <div class="axis"><span>${esc(label(from))}</span><span>Пн — Нд згори вниз</span><span>${esc(isoDay(to) === isoDay(new Date()) ? 'сьогодні' : label(to))}</span></div></div>`;
+}
+// the month picked on the timeline (custom range = exactly one calendar month), or ''
+const oneMonth = () => filt.range === 'custom' && /^\d{4}-\d{2}-01$/.test(filt.from) && filt.to === monthEnd(filt.from.slice(0, 7)) ? filt.from.slice(0, 7) : '';
+function openStats() { if (selected) { selected = null; redraw(false); } openSheet('stats'); renderStats(); }
+// keep the scroll position when a sheet re-renders itself (tab switch, filters); if the new content is
+// shorter, pad the bottom so the view does not jump up
+function holdScroll(kind) {
+  const sh = $('sheet'), b = sh.dataset.kind === kind ? sh.querySelector('.st-body') : null, keep = b ? b.scrollTop : 0;
+  // the sheet also keeps its height while you stay in it, so shorter content does not shrink it and reset the scroll
+  sh.style.minHeight = b ? sh.offsetHeight + 'px' : '';
+  return () => {
+    sh.dataset.kind = kind;
+    const nb = sh.querySelector('.st-body'); if (!keep || !nb) return;
+    // grow a spacer at the bottom until the old scroll position fits again
+    const pad = document.createElement('div'); nb.appendChild(pad);
+    for (let i = 0, h = 0; i < 4; i++) { const need = keep + nb.clientHeight - nb.scrollHeight; if (need <= 0) break; h += need; pad.style.height = h + 'px'; }
+    nb.scrollTop = keep;
+  };
+}
+function renderStats(playingMonth) {
+  const restore = holdScroll('stats');
+  const vis = visibleEntries(), orders = vis.flatMap(e => e.orders);
+  // summary
+  const agg = moneyAgg(orders), avg = agg.n ? fmtMoney(agg.v / agg.n, agg.cur) : '—';
+  const buyers = new Map(); orders.forEach(o => { const k = buyerKey(o); if (k) buyers.set(k, Math.max(buyers.get(k)||0, o.of||1)); });
+  const repeatPct = buyers.size ? Math.round([...buyers.values()].filter(n => n > 1).length / buyers.size * 100) + '%' : (viewOnly && orders.some(o => o.of > 1) ? Math.round(orders.filter(o => o.of > 1).length / orders.length * 100) + '% зам.' : '—');
+  const itemsSold = orders.reduce((s,o) => s + (o.itemsCount || itemsOf(o).length || 1), 0);
+  const shipD = orders.map(shipDays).filter(d => d != null), avgShip = shipD.length ? shipD.reduce((a,b) => a+b, 0) / shipD.length : null;
+  const discN = orders.filter(o => orderDiscount(o) > 0).length;
+  let dSum = 0, dN = 0; vis.forEach(e => { if (!e.shop.origin) return; const d = distKm([e.shop.origin.lat, e.shop.origin.lng], [e.place.lat, e.place.lng]); dSum += d * e.orders.length; dN += e.orders.length; });
+  // timeline (ignores the date filter, highlights months inside it)
+  const allTime = visibleEntries(null), months = monthsOf(allTime), maxM = Math.max(1, ...months.map(m => m.n)), b = rangeBounds();
+  const inRange = k => { if (playingMonth) return k <= playingMonth; if (!b) return true; const [y,m] = k.split('-').map(Number); const s = +new Date(y, m-1, 1), e = +new Date(y, m, 1); return s < b[1] && e > b[0]; };
+  const bars = months.map(m => `<div class="${inRange(m.k)?'in':''}" style="height:${Math.max(3, m.n/maxM*100)}%" data-k="${m.k}" data-tip="${monthLabel(m.k)} · ${m.n} зам.${oneMonth() === m.k ? ' · клік — скинути' : ''}"></div>`).join('');
+  // ranking lists
+  const rank = rankHTML;
+  let rows = [], onPick = () => {}, note = '', extra = '', after = null;
+  if (statsTab === 'cities') {
+    const m = new Map(); vis.forEach(e => { const k = placeKey(e.place); if (!m.has(k)) m.set(k, { e, orders:[] }); m.get(k).orders.push(...e.orders); if (e.orders.length > m.get(k).e.orders.length) m.get(k).e = e; });
+    const list = [...m.values()].sort((a,b) => b.orders.length - a.orders.length).slice(0, 30), mx = list[0]?.orders.length || 1;
+    rows = list.map(x => ({ name:esc(x.e.place.city||'—'), sub:esc([x.e.place.state, x.e.place.country].filter(Boolean).join(', ')), val:x.orders.length, rev:sumMoney(x.orders), share:x.orders.length/mx }));
+    onPick = i => { const e = list[i].e; map.setView([e.place.lat, e.place.lng], Math.max(map.getZoom(), 7)); openPlace(e, false); };
+  } else if (statsTab === 'countries') {
+    const m = new Map(); vis.forEach(e => { const k = e.place.country||'—'; if (!m.has(k)) m.set(k, { c:k, orders:[], cities:new Set() }); m.get(k).orders.push(...e.orders); m.get(k).cities.add(placeKey(e.place)); });
+    const list = [...m.values()].sort((a,b) => b.orders.length - a.orders.length), mx = list[0]?.orders.length || 1;
+    rows = list.map(x => ({ name:esc(x.c), sub:`${x.cities.size} міст`, val:x.orders.length, rev:sumMoney(x.orders), share:x.orders.length/mx, on:filt.countries.has(x.c) }));
+    onPick = i => { filt.countries = new Set([list[i].c]); refresh(true); };
+  } else if (statsTab === 'states') {
+    const m = new Map(); vis.forEach(e => { if (!isUS(e.place.country)) return; const sc = stateCode(e.place.state); if (!sc) return; if (!m.has(sc)) m.set(sc, { sc, orders:[], pts:[] }); m.get(sc).orders.push(...e.orders); m.get(sc).pts.push([e.place.lat, e.place.lng]); });
+    const list = [...m.values()].map(x => ({ ...x, per: x.orders.length / US[x.sc][1] })).sort((a,b) => b.per - a.per), mx = list[0]?.per || 1;
+    rows = list.map(x => ({ name:esc(US[x.sc][0]), sub:`${x.orders.length} зам.`, val:x.per.toFixed(1), rev:'на 1 млн', share:x.per/mx }));
+    note = 'Скільки замовлень припадає на 1 млн жителів штату (перепис 2020). Вгорі — штати, де вас купують найактивніше відносно населення.';
+    onPick = i => map.fitBounds(L.latLngBounds(list[i].pts).pad(.5), { maxZoom:7 });
+  } else if (statsTab === 'buyers') {
+    const m = new Map(); vis.forEach(e => e.orders.forEach(o => { const k = buyerKey(o); if (!k || !(o.of > 1)) return; if (!m.has(k)) m.set(k, { name:o.buyer, of:o.of, orders:[], city:e.place.city, state:e.place.state, country:e.place.country, shop:e.shop.name, first:Infinity, last:0 }); const x = m.get(k); x.orders.push(o); const t = Date.parse(o.date); if (!isNaN(t)) { x.first = Math.min(x.first, t); x.last = Math.max(x.last, t); } }));
+    const list = [...m.values()].sort((a,b) => b.of - a.of || b.last - a.last).slice(0, 100), mx = list[0]?.of || 1;
+    rows = list.map((x,i) => ({ name: privacy ? `Покупець #${i+1}` : esc(x.name), sub:esc([x.city, x.last ? 'ост. ' + fmtDay(new Date(x.last)) : ''].filter(Boolean).join(' · ')), val:`${x.of}×`, rev:sumMoney(x.orders), share:x.of/mx }));
+    note = viewOnly ? 'Імена покупців не передаються в посиланні для перегляду.'
+      : list.length ? `${list.length} постійних клієнтів — купували більше одного разу. Натисніть, щоб знайти на мапі.` + (privacy ? '' : ' <button class="link" id="buyersCsv">⬇ Список у CSV</button>') : 'Поки що немає покупців з кількома замовленнями.';
+    after = () => { if ($('buyersCsv')) $('buyersCsv').onclick = () => downloadCSV(['Shop','Buyer','City','State','Country','Orders (all time)','Orders in period','Spent in period','First order','Last order'],
+      list.map(x => [x.shop, x.name, x.city, x.state, x.country, x.of, x.orders.length, sumMoney(x.orders), x.first < Infinity ? isoDay(new Date(x.first)) : '', x.last ? isoDay(new Date(x.last)) : '']), `etsy-repeat-buyers-${isoDay(new Date())}.csv`); };
+    onPick = i => { if (privacy) return; filt.q = list[i].name; $('q').value = filt.q; closeSheet(); refresh(true); };
+  } else if (statsTab === 'items') {
+    const m = new Map(); vis.forEach(e => e.orders.forEach(o => itemsOf(o).forEach(it => { const k = itemKey(it); if (!k) return; if (!m.has(k)) m.set(k, { it, n:0, cities:new Set() }); m.get(k).n++; m.get(k).cities.add(placeKey(e.place)); })));
+    const list = [...m.values()].sort((a,b) => b.n - a.n).slice(0, 30), mx = list[0]?.n || 1;
+    rows = list.map(x => ({ name: listingLink(x.it), sub:`${x.cities.size} міст`, val:`${x.n}×`, share:x.n/mx, on: filt.item?.k === itemKey(x.it) }));
+    note = list.length ? 'Натисніть на рядок, щоб показати на мапі лише покупців цього товару.' : (viewOnly ? 'Товари не передаються в посиланні для перегляду.' : 'Назви товарів є у файлі «Sold Order Items».');
+    onPick = i => setItemFilter(filt.item?.k === itemKey(list[i].it) ? null : list[i].it);
+  } else if (statsTab === 'speed') {
+    const list = []; vis.forEach(e => e.orders.forEach(o => { const d = shipDays(o); if (d != null) list.push({ o, e, d }); }));
+    list.sort((a,b) => b.d - a.d);
+    const B = [['0–1 дн.', d => d <= 1], ['2–3 дн.', d => d >= 2 && d <= 3], ['4–7 дн.', d => d >= 4 && d <= 7], ['8+ дн.', d => d >= 8]];
+    if (list.length) extra = `<div class="st-grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:6px">${B.map(([l,f]) => { const n = list.filter(x => f(x.d)).length; return `<div class="m-stat"><b>${Math.round(n / list.length * 100)}%</b><span>${l}</span></div>`; }).join('')}</div><div class="m-h" style="padding-left:2px">Найдовше чекали відправки</div>`;
+    const top = list.slice(0, 30), mx = top[0]?.d || 1;
+    rows = top.map(x => ({ name: privacy || !x.o.buyer ? esc(x.e.place.city || '—') : esc(x.o.buyer), sub:esc([fmtDate(x.o.date), x.o.id ? '#' + x.o.id : ''].filter(Boolean).join(' · ')), val:`${x.d} дн.`, share:Math.max(.04, x.d / mx) }));
+    note = list.length ? 'Скільки днів минуло від продажу до відправки (колонка Date Shipped).' : (viewOnly ? 'Дати відправки не передаються в посиланні для перегляду.' : 'Немає дат відправки. Завантажте ще раз «Sold Orders» або «Sold Order Items» — тепер з них береться колонка Date Shipped.');
+    onPick = i => focusEntry(top[i].e);
+  } else { // shipping by country
+    const m = new Map(); vis.forEach(e => e.orders.forEach(o => { if (o.shipping == null) return; const k = e.place.country||'—'; if (!m.has(k)) m.set(k, { c:k, orders:[], shares:[] }); m.get(k).orders.push(o); const gross = o.itemLevel ? (o.total||0) + o.shipping : o.total; if (gross > 0) m.get(k).shares.push(o.shipping / gross); }));
+    const list = [...m.values()].map(x => { const a = moneyAgg(x.orders, 'shipping'); return { ...x, avg: a.n ? a.v / a.n : 0, cur:a.cur, share: x.shares.length ? x.shares.reduce((s,v)=>s+v,0) / x.shares.length : 0 }; }).sort((a,b) => b.orders.length - a.orders.length), mx = Math.max(...list.map(x => x.share), .0001);
+    rows = list.map(x => ({ name:esc(x.c), sub:`${x.orders.length} зам.`, val: fmtMoney(x.avg, x.cur), rev: Math.round(x.share*100) + '% чеку', share:x.share/mx }));
+    note = list.length ? 'Середня вартість доставки й її частка в сумі замовлення.' : (viewOnly ? 'Дані про доставку не передаються в посиланні.' : 'Немає даних про доставку — завантажте файл «Sold Orders» (у ньому є колонка Shipping).');
+    onPick = i => { filt.countries = new Set([list[i].c]); refresh(true); };
+  }
+  const TABS = [['cities','Міста'],['countries','Країни'],['states','Штати США'],['buyers','Постійні клієнти'],['items','Товари'],['shipping','Доставка'],['speed','Час відправки']];
+  queueMicrotask(restore);
+  $('sheet').innerHTML = `
+    <div class="m-head"><div class="m-pin">📊</div>
+      <div style="flex:1;min-width:0"><div class="m-title">Статистика</div><div class="m-sub">${esc(rangeLabel())} · ${shops.filter(s=>s.visible).length} магазин(и)${filt.item ? ' · '+esc(filt.item.t) : ''}</div></div>
+      <button class="ib" id="mClose" title="Закрити (Esc)">✕</button></div>
+    <div class="st-body">
+      <div class="st-grid">
+        <div class="m-stat"><b>${esc(avg)}</b><span>Середній чек</span></div>
+        <div class="m-stat"><b>${repeatPct}</b><span>Повторні покупці</span></div>
+        <div class="m-stat"><b>${itemsSold}</b><span>Товарів продано</span></div>
+        <div class="m-stat"><b>${dN ? '~'+fmtKm(dSum/dN) : '—'}</b><span>${dN ? 'Сер. відстань' : 'Відстань: вкажіть місто ✎'}</span></div>
+        <div class="m-stat"><b>${avgShip == null ? '—' : avgShip.toFixed(1) + ' дн.'}</b><span>Сер. час відправки</span></div>
+        <div class="m-stat"><b>${orders.length ? Math.round(discN / orders.length * 100) + '%' : '—'}</b><span>Замовлень зі знижкою</span></div>
+      </div>
+      <div class="chart">
+        <div class="row"><span class="lbl" style="margin:0">Замовлення по місяцях</span><button class="link" id="playBtn" style="white-space:nowrap">${playTimer ? '⏸ Пауза' : tl ? '▶ Продовжити' : '▶ Таймлапс на мапі'}</button></div>
+        ${months.length ? `<div class="bars" id="tlBars">${bars}</div><div class="axis"><span>${monthLabel(months[0].k)}</span><span>${playingMonth ? '<b style="color:var(--accent)">'+monthLabel(playingMonth)+'</b>' : filt.range !== 'all' && !tl ? `<button class="chip on" id="tlReset" style="font-size:11.5px;padding:1px 9px" title="Показати всі місяці">✕ ${esc(oneMonth() ? monthLabel(oneMonth()) : 'Скинути період')}</button>` : ''}</span><span>${monthLabel(months[months.length-1].k)}</span></div>` : '<div class="empty">Немає дат замовлень</div>'}
+      </div>
+      ${seasonHTML(allTime)}
+      ${calendarHTML(vis)}
+      <div class="tabs">${TABS.map(([k,l]) => `<button data-t="${k}" class="${statsTab===k?'on':''}">${l}</button>`).join('')}</div>
+      ${note ? `<div class="tab-note">${note}</div>` : ''}
+      ${extra}
+      <div class="rk-list" id="rkList">${rank(rows)}</div>
+    </div>`;
+  $('mClose').onclick = closeSheet;
+  $('playBtn').onclick = () => togglePlay();
+  $('sheet').querySelectorAll('.tabs button').forEach(b => b.onclick = () => { statsTab = b.dataset.t; renderStats(); });
+  $('tlBars')?.addEventListener('click', ev => { const k = ev.target.dataset?.k; if (!k) return; stopPlay(); if (oneMonth() === k) setRange('all'); else setRange('custom', k+'-01', monthEnd(k)); });
+  if ($('tlReset')) $('tlReset').onclick = () => { stopPlay(false); setRange('all'); };
+  $('rkList').onclick = ev => { if (ev.target.closest('a')) return; const r = ev.target.closest('.rk'); if (r) onPick(+r.dataset.i); };
+  $('calGrid')?.addEventListener('click', ev => { const d = ev.target.dataset?.d; if (!d) return; stopPlay(false); setRange('custom', d, d); });
+  after?.();
+}
+
+// ================= right sheet: money (goal, product costs, discounts, income tax) =================
+const jget = (k, d) => { try { return { ...d, ...JSON.parse(ls.get(k) || '{}') }; } catch { return { ...d }; } };
+let moneyTab = ['goal','margin','coupons','tax'].includes(ls.get('etsyMoneyTab')) ? ls.get('etsyMoneyTab') : 'goal';
+let goal = jget('etsyGoal', { period:'month', amount:0, cur:'' });
+let taxCfg = jget('etsyTax', { rate:5, base:'', year:new Date().getFullYear() });
+if (taxCfg.extra == null) taxCfg.extra = taxCfg.vz === false ? 0 : 1; // older setting: Ukrainian military levy on/off
+if (taxCfg.cur == null) taxCfg.cur = 'UAH';
+const PERIODS = [['month','Місяць'],['quarter','Квартал'],['year','Рік']], PER_LBL = { month:'місяць', quarter:'квартал', year:'рік' };
+function periodBounds(k, n = new Date()) {
+  const y = n.getFullYear(), m = n.getMonth();
+  if (k === 'year') return [+new Date(y, 0, 1), +new Date(y+1, 0, 1)];
+  if (k === 'quarter') { const q = Math.floor(m/3)*3; return [+new Date(y, q, 1), +new Date(y, q+3, 1)]; }
+  return [+new Date(y, m, 1), +new Date(y, m+1, 1)];
+}
+const periodName = (k, b) => { const d = new Date(b[0]); return k === 'year' ? String(d.getFullYear()) : k === 'quarter' ? `${Math.floor(d.getMonth()/3)+1} кв. ${d.getFullYear()}` : monthLabel(monthKey(b[0])); };
+const curSymbol = c => fmtMoney(0, c).replace(/[\d.,\s]/g, '') || c;
+const convTo = (v, from, to) => from === to ? v : rates?.[from] && rates?.[to] ? v / rates[from] * rates[to] : null;
+let ratesTry = null;
+const needRates = () => { if (!rates && !ratesTry) ratesTry = loadRates().then(ok => { if (ok) refresh(false); }); };
+const allOrders = () => shops.filter(s => s.visible).flatMap(s => s.places.flatMap(p => p.orders));
+const ordersIn = b => allOrders().filter(o => { const t = Date.parse(o.date); return !isNaN(t) && t >= b[0] && t < b[1]; });
+function sumIn(orders, cur) {
+  let v = 0, miss = 0;
+  orders.forEach(o => { if (o.total == null) return; const c = convTo(o.total, o.currency || 'USD', cur); if (c == null) { miss++; needRates(); } else v += c; });
+  return { v, miss };
+}
+const goalCur = () => goal.cur || dispCur || moneyAgg(allOrders()).cur || 'USD';
+// the goal ignores filters: all orders of visible shops in the current month / quarter / year
+function goalStatus() {
+  if (!(goal.amount > 0)) return null;
+  const b = periodBounds(goal.period), cur = goalCur(), s = sumIn(ordersIn(b), cur);
+  const f = Math.min(1, Math.max(0, (Date.now() - b[0]) / (b[1] - b[0])));
+  return { b, cur, ...s, pct: s.v / goal.amount, f, forecast: f > .04 ? s.v / f : null, left: Math.max(0, goal.amount - s.v), daysLeft: Math.max(1, Math.ceil((b[1] - Date.now()) / 864e5)) };
+}
+function updateGoalBar() {
+  const g = viewOnly ? null : goalStatus(), el = $('gRev');
+  el.classList.toggle('show', !!g);
+  if (!g) return el.removeAttribute('title');
+  el.firstChild.style.width = Math.min(100, g.pct * 100) + '%';
+  el.title = `Натисніть, щоб відкрити ціль. Ціль на ${PER_LBL[goal.period]}: ${fmtMoney(g.v, g.cur)} з ${fmtMoney(goal.amount, g.cur)} (${Math.round(g.pct * 100)}%)`;
+}
+
+function openMoney() { if (selected) { selected = null; redraw(false); } openSheet('money'); renderMoney(); }
+function renderMoney() {
+  const TABS = [['goal','🎯 Ціль'],['margin','📦 Собівартість'],['coupons','🏷 Знижки'],['tax','🧾 Податок']];
+  const SUB = { goal:'Прогрес і прогноз доходу', margin:rangeLabel() + ' · прибуток по товарах', coupons:rangeLabel() + ' · купони й розпродажі', tax:'Податок з доходу за вашою ставкою' };
+  const [body, after] = moneyTab === 'goal' ? goalHTML() : moneyTab === 'margin' ? marginHTML() : moneyTab === 'coupons' ? couponsHTML() : taxHTML();
+  const restore = holdScroll('money');
+  $('sheet').innerHTML = `
+    <div class="m-head"><div class="m-pin">💰</div>
+      <div style="flex:1;min-width:0"><div class="m-title">Гроші</div><div class="m-sub">${esc(SUB[moneyTab])}</div></div>
+      <button class="ib" id="mClose" title="Закрити (Esc)">✕</button></div>
+    <div class="st-body" id="mnBody"><div class="tabs" style="margin-top:0">${TABS.map(([k,l]) => `<button data-t="${k}" class="${moneyTab===k?'on':''}">${l}</button>`).join('')}</div>${body}</div>`;
+  restore();
+  $('mClose').onclick = closeSheet;
+  $('sheet').querySelectorAll('.tabs button').forEach(b => b.onclick = () => { moneyTab = b.dataset.t; ls.set('etsyMoneyTab', moneyTab); renderMoney(); syncTopButtons(); });
+  after?.();
+}
+
+// ---- goal ----
+function goalHTML() {
+  const cur = goalCur(), g = goalStatus();
+  let html = `<div class="lbl">Ціль доходу</div>
+    <div class="gform"><div class="chips">${PERIODS.map(([k,l]) => `<button class="chip${goal.period===k?' on':''}" data-p="${k}">${l}</button>`).join('')}</div>
+      <label class="money-in"><span>${esc(curSymbol(cur))}</span><input type="number" id="goalAmt" min="0" step="50" inputmode="decimal" placeholder="Напр. 2000" value="${goal.amount > 0 ? goal.amount : ''}"></label></div>`;
+  if (!g) html += '<div class="empty">Вкажіть суму — і тут з\'явиться прогрес, прогноз до кінця періоду та скільки треба продавати щодня. Під плиткою «Дохід» теж буде смужка прогресу.</div>';
+  else {
+    const ahead = g.v >= goal.amount * g.f;
+    html += `<div class="goal-big"><b>${esc(fmtMoney(g.v, cur))}</b><span>з ${esc(fmtMoney(goal.amount, cur))} · ${Math.round(g.pct * 100)}%</span></div>
+      <div class="prog"><i style="width:${Math.min(100, g.pct * 100)}%"></i><em style="left:${g.f * 100}%" title="Сьогодні: минуло ${Math.round(g.f * 100)}% періоду"></em></div>
+      <div class="hint" style="margin:7px 0 12px">${esc(periodName(goal.period, g.b))} · минуло ${Math.round(g.f * 100)}% періоду (риска на смужці)${g.miss ? ` · ${g.miss} зам. в іншій валюті без курсу` : ''}</div>
+      <div class="st-grid">
+        <div class="m-stat"><b class="${g.forecast == null ? '' : g.forecast >= goal.amount ? 'pos' : 'neg'}">${g.forecast == null ? '—' : esc(fmtMoney(g.forecast, cur))}</b><span>Прогноз на кінець</span></div>
+        <div class="m-stat"><b>${g.left ? esc(fmtMoney(g.left / g.daysLeft, cur)) : '✓'}</b><span>${g.left ? `Треба на день · ще ${g.daysLeft} дн.` : 'Ціль досягнута'}</span></div>
+      </div>
+      <div class="tab-note" style="padding:10px 2px 0">${g.pct >= 1 ? '🎉 Ціль уже виконана!' : ahead ? '✅ Йдете з випередженням графіка.' : '⚠️ Поки що відстаєте від графіка.'} Прогноз рахується так, ніби продажі й далі йтимуть тим самим темпом. Фільтри не враховуються — лише видимі магазини.</div>`;
+    const hist = [];
+    for (let i = 1; i <= 6; i++) {
+      const n = new Date(), d = goal.period === 'year' ? new Date(n.getFullYear() - i, 6, 1) : new Date(n.getFullYear(), n.getMonth() - (goal.period === 'quarter' ? 3 : 1) * i, 15);
+      const b = periodBounds(goal.period, d), x = sumIn(ordersIn(b), cur); if (x.v > 0) hist.push({ b, v:x.v });
+    }
+    if (hist.length) {
+      const mx = Math.max(goal.amount, ...hist.map(h => h.v));
+      html += `<div class="lbl">Попередні періоди проти цієї цілі</div><div class="rk-list">` + rankHTML(hist.map(h => ({ name:esc(periodName(goal.period, h.b)), val:esc(fmtMoney(h.v, cur)), rev:Math.round(h.v / goal.amount * 100) + '%', share:h.v / mx, on:h.v >= goal.amount }))) + '</div>';
+    }
+  }
+  return [html, () => {
+    const save = () => { ls.set('etsyGoal', JSON.stringify(goal)); renderMoney(); updateGoalBar(); syncTopButtons(); };
+    $('sheet').querySelectorAll('[data-p]').forEach(b => b.onclick = () => { goal.period = b.dataset.p; save(); });
+    $('goalAmt').onchange = e => { goal.amount = Math.max(0, parseFloat(e.target.value) || 0); goal.cur = goal.amount ? cur : ''; save(); };
+  }];
+}
+
+// ---- cost of goods & margin per listing ----
+function itemStats(entries) {
+  const m = new Map();
+  entries.forEach(e => e.orders.forEach(o => itemsOf(o).forEach(it => {
+    const k = itemKey(it); if (!k) return;
+    const key = e.shop.id + '|' + k, lp = linePaid(it, o), oc = o.currency || 'USD';
+    if (!m.has(key)) m.set(key, { shop:e.shop, it, k, units:0, rev:0, cur:oc, miss:0 });
+    const x = m.get(key); x.units += it.q || 1;
+    const v = lp.paid == null ? null : convTo(lp.paid, oc, x.cur);
+    if (v == null) x.miss++; else x.rev += v;
+  })));
+  return [...m.values()].sort((a,b) => b.rev - a.rev || b.units - a.units);
+}
+function marginHTML() {
+  const list = itemStats(visibleEntries()).slice(0, 150);
+  if (!list.length) return ['<div class="empty">Тут з\'являться товари з файлу «Sold Order Items». Для кожного вкажете собівартість однієї штуки — і побачите реальний прибуток і маржу.</div>'];
+  const many = shops.filter(s => s.visible).length > 1;
+  const res = x => { const c = unitCost(x.shop, x.it); if (c == null) return '<span class="muted">—</span>'; const pr = x.rev - c * x.units, mg = x.rev ? pr / x.rev : 0; return `<b class="${pr >= 0 ? 'pos' : 'neg'}">${pr >= 0 ? '+' : ''}${esc(fmtMoney(pr, x.cur))}</b><small>маржа ${Math.round(mg * 100)}%</small>`; };
+  const sum = () => {
+    const w = list.filter(x => unitCost(x.shop, x.it) != null);
+    const rev = moneyAgg(w.map(x => ({ currency:x.cur, v:x.rev })), 'v'), cg = moneyAgg(w.map(x => ({ currency:x.cur, v:unitCost(x.shop, x.it) * x.units })), 'v'), pr = moneyAgg(w.map(x => ({ currency:x.cur, v:x.rev - unitCost(x.shop, x.it) * x.units })), 'v');
+    return `<div class="st-grid">
+      <div class="m-stat"><b>${esc(fmtAgg(rev))}</b><span>Дохід з цих товарів</span></div>
+      <div class="m-stat"><b class="${cg.n ? 'neg' : ''}">${cg.n ? '-' : ''}${esc(fmtAgg(cg))}</b><span>Собівартість</span></div>
+      <div class="m-stat"><b class="${pr.n ? (pr.v >= 0 ? 'pos' : 'neg') : ''}">${pr.n && pr.v > 0 ? '+' : ''}${esc(fmtAgg(pr))}</b><span>Валовий прибуток</span></div>
+      <div class="m-stat"><b>${rev.n && rev.v ? Math.round(pr.v / rev.v * 100) + '%' : '—'}</b><span>Маржа · ${w.length} з ${list.length} тов.</span></div></div>`;
+  };
+  const rows = list.map((x, i) => `<div class="mg"><div class="mid"><div class="tt">${listingLink(x.it)}</div>
+      <div class="mm">${many ? `<span class="sn">${esc(x.shop.name)}</span> · ` : ''}${x.units} шт. · ${esc(fmtMoney(x.rev, x.cur))}${x.miss ? ` · ${x.miss} без ціни` : ''}</div></div>
+      <label class="money-in sm" title="Собівартість 1 шт."><span>${esc(curSymbol(x.cur))}</span><input type="number" min="0" step="0.01" inputmode="decimal" data-i="${i}" placeholder="за 1 шт." value="${unitCost(x.shop, x.it) ?? ''}"></label>
+      <div class="mg-r" id="mgR${i}">${res(x)}</div></div>`).join('');
+  return [`<div class="tab-note" style="padding:0 2px 10px">Вкажіть, скільки вам коштує <b>1 штука</b> товару: матеріали, друк, пакування. Дохід — це ціна, яку заплатив покупець, уже зі знижкою. Собівартість також додається до плиток «Витрати» й «Чистий прибуток».</div>
+    <div id="mgSum">${sum()}</div><div class="lbl">Товари · ${esc(rangeLabel())}</div>${rows}`, () => {
+    $('sheet').querySelectorAll('.mg input').forEach(inp => inp.onchange = () => {
+      const x = list[+inp.dataset.i], raw = inp.value.trim(), v = raw === '' ? null : parseFloat(raw);
+      x.shop.costs ||= {};
+      if (v == null || isNaN(v) || v < 0) delete x.shop.costs[x.k]; else x.shop.costs[x.k] = Math.round(v * 100) / 100;
+      // the same listing may appear in several rows only across shops; refresh every row of this shop+listing
+      list.forEach((y, j) => { if (y.shop === x.shop && y.k === x.k) $('mgR' + j).innerHTML = res(y); });
+      saveShops(); $('mgSum').innerHTML = sum(); if (!viewOnly) updateFinanceKPIs(compareBounds());
+    });
+  }];
+}
+
+// ---- discounts & coupons ----
+function couponsHTML() {
+  const orders = visibleEntries().flatMap(e => e.orders);
+  if (!orders.length) return ['<div class="empty">Немає замовлень для цих фільтрів</div>'];
+  const known = orders.some(o => o.discount != null || o.coupon || itemsOf(o).some(it => it.d != null));
+  const withD = orders.filter(o => orderDiscount(o) > 0 || o.coupon), noD = orders.filter(o => !(orderDiscount(o) > 0 || o.coupon));
+  const dAgg = moneyAgg(withD.map(o => ({ currency:o.currency || 'USD', v:orderDiscount(o) })), 'v');
+  const gross = moneyAgg(withD.map(o => ({ currency:o.currency || 'USD', v:(o.total || 0) + orderDiscount(o) })), 'v');
+  const avg = list => { const a = moneyAgg(list); return a.n ? fmtMoney(a.v / a.n, a.cur) : '—'; };
+  let html = `<div class="st-grid">
+    <div class="m-stat"><b>${withD.length} · ${Math.round(withD.length / orders.length * 100)}%</b><span>Замовлень зі знижкою</span></div>
+    <div class="m-stat"><b class="${dAgg.n && dAgg.v > 0 ? 'neg' : ''}">${dAgg.n && dAgg.v > 0 ? '-' : ''}${esc(fmtAgg(dAgg))}</b><span>Віддано на знижках</span></div>
+    <div class="m-stat"><b>${esc(avg(withD))}</b><span>Чек зі знижкою</span></div>
+    <div class="m-stat"><b>${esc(avg(noD))}</b><span>Чек без знижки</span></div></div>`;
+  if (gross.n && gross.v > 0 && dAgg.cur === gross.cur) html += `<div class="hint" style="margin:8px 2px 0">Середня знижка — ${Math.round(dAgg.v / gross.v * 100)}% від ціни.</div>`;
+  const m = new Map();
+  withD.forEach(o => { const k = o.coupon || ''; if (!m.has(k)) m.set(k, { code:k, info:o.couponInfo || '', orders:[] }); const x = m.get(k); x.orders.push(o); if (!x.info && o.couponInfo) x.info = o.couponInfo; });
+  const list = [...m.values()].map(x => ({ ...x, d:moneyAgg(x.orders.map(o => ({ currency:o.currency || 'USD', v:orderDiscount(o) })), 'v') })).sort((a,b) => b.orders.length - a.orders.length), mx = list[0]?.orders.length || 1;
+  html += `<div class="lbl">Купони й розпродажі</div><div class="rk-list">` + rankHTML(list.map(x => ({ name:esc(x.code || 'Розпродаж / без коду'), sub:esc(x.info), val:`${x.orders.length} зам.`, rev:(x.d.n && x.d.v ? '-' + fmtMoney(x.d.v, x.d.cur) + ' · ' : '') + sumMoney(x.orders), share:x.orders.length / mx }))) + '</div>';
+  html += `<div class="tab-note" style="padding:10px 2px 0">${known ? 'Окупність: порівняйте, скільки замовлень і доходу дав купон, із сумою, яку ви на ньому втратили.' : 'Немає даних про знижки. Завантажте «Sold Orders» (колонки Coupon Code, Discount Amount) — можна разом з іншими файлами.'}</div>`;
+  return [html];
+}
+
+// ---- income tax: your own rate(s), any currency (converted at the NBU rate of each day, via UAH) ----
+let nbu = null, nbuBusy = false; const nbuTried = new Set();
+const nbuKey = t => { const d = new Date(t); return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`; };
+const nbuRate = (cur, t) => cur === 'UAH' ? 1 : nbu?.[nbuKey(t)]?.[cur] ?? null;
+async function nbuLoad(keys, onStep) { // one request per day returns every currency of that day
+  const todo = [...new Set(keys)]; let done = 0;
+  const worker = async () => { while (todo.length) { const k = todo.shift(); nbuTried.add(k);
+    try { const j = await (await fetch(`https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?date=${k}&json`)).json(); if (Array.isArray(j) && j.length) nbu[k] = Object.fromEntries(j.map(x => [x.cc, x.rate])); } catch {}
+    onStep?.(++done); } };
+  await Promise.all([1,2,3,4].map(worker));
+  kv.set('nbu', nbu);
+}
+const hasDeposits = () => shops.some(s => s.visible && s.ledger?.some(r => r.cat === 'deposit'));
+function taxRecords(base, year) {
+  const y0 = +new Date(year, 0, 1), y1 = +new Date(year + 1, 0, 1), vs = shops.filter(s => s.visible);
+  const recs = base === 'deposits'
+    ? vs.flatMap(s => (s.ledger || []).filter(r => r.cat === 'deposit').map(r => ({ t:Date.parse(r.date), v:Math.abs(r.net), cur:r.currency || 'USD', src:'Виплата Etsy на рахунок', shop:s.name })))
+    : vs.flatMap(s => s.places.flatMap(p => p.orders.filter(o => o.total != null).map(o => ({ t:Date.parse(o.date), v:o.total, cur:o.currency || 'USD', src:'Замовлення' + (o.id ? ' #' + o.id : ''), shop:s.name }))));
+  return recs.filter(r => r.t >= y0 && r.t < y1).sort((a,b) => a.t - b.t);
+}
+function taxHTML() {
+  if (nbu == null) { kv.get('nbu').then(v => { nbu = v || {}; if (sheet === 'money' && moneyTab === 'tax') renderMoney(); }); return ['<div class="empty">Завантаження…</div>']; }
+  const deps = hasDeposits(), base = taxCfg.base === 'orders' || !deps ? 'orders' : 'deposits';
+  const years = new Set([new Date().getFullYear()]);
+  allOrders().forEach(o => { const t = Date.parse(o.date); if (!isNaN(t)) years.add(new Date(t).getFullYear()); });
+  const recs = taxRecords(base, taxCfg.year), today = nbuKey(Date.now());
+  // report currency: the one chosen, or the most common one in the records
+  const cnt = {}; recs.forEach(r => cnt[r.cur] = (cnt[r.cur] || 0) + 1);
+  const rc = taxCfg.cur || Object.entries(cnt).sort((a,b) => b[1] - a[1])[0]?.[0] || 'USD';
+  const fx = (cur, t) => { if (cur === rc) return 1; const a = nbuRate(cur, t), b = nbuRate(rc, t); return a != null && b ? a / b : null; };
+  const missing = recs.filter(r => fx(r.cur, r.t) == null).map(r => nbuKey(r.t)).filter(k => k <= today && !nbuTried.has(k));
+  if (missing.length && !nbuBusy) {
+    nbuBusy = true; const total = new Set(missing).size;
+    nbuLoad(missing, d => { const el = $('taxProg'); if (el) el.textContent = `Завантажую курси НБУ… ${d} з ${total}`; })
+      .finally(() => { nbuBusy = false; if (sheet === 'money' && moneyTab === 'tax') renderMoney(); });
+  }
+  const rate = +taxCfg.rate || 0, extra = +taxCfg.extra || 0, Q = [0,1,2,3].map(() => ({ inc:0, n:0 }));
+  let miss = 0, conv = 0;
+  recs.forEach(r => { const k = fx(r.cur, r.t); if (k == null) { miss++; return; } if (r.cur !== rc) conv++; const q = Q[Math.floor(new Date(r.t).getMonth() / 3)]; q.inc += r.v * k; q.n++; });
+  const U = v => fmtMoney(v, rc), tot = Q.reduce((s, q) => s + q.inc, 0), taxOf = v => v * (rate + extra) / 100;
+  const fop = rate === 5 && extra === 1 && taxCfg.cur === 'UAH';
+  let html = `<div class="cfg" style="margin-bottom:10px">
+      <div class="chips">${[...years].sort((a,b) => b - a).map(y => `<button class="chip${taxCfg.year === y ? ' on' : ''}" data-y="${y}">${y}</button>`).join('')}</div></div>
+    <div class="lbl" style="margin-top:4px">Ставка</div>
+    <div class="cfg">
+      <label>Податок <span class="money-in sm"><input type="number" id="taxRate" min="0" max="60" step="0.5" value="${rate}"><span>%</span></span></label>
+      <label title="Наприклад, військовий збір, соціальний внесок або місцевий податок">+ збір <span class="money-in sm"><input type="number" id="taxExtra" min="0" max="60" step="0.5" value="${extra}"><span>%</span></span></label>
+      <button class="chip${fop ? ' on' : ''}" id="taxFop" title="5% єдиний податок + 1% військовий збір, у гривнях">🇺🇦 ФОП 3 група</button></div>
+    <div class="lbl">Валюта звіту</div>
+    <div class="chips">${CURS.map(([c,l]) => `<button class="chip${taxCfg.cur === c ? ' on' : ''}" data-c="${c}">${l}</button>`).join('')}</div>
+    <div class="lbl">Що вважати доходом</div>
+    <div class="chips"><button class="chip${base === 'deposits' ? ' on' : ''}" data-b="deposits"${deps ? '' : ' disabled style="opacity:.45;cursor:default"'}>Виплати Etsy на рахунок</button><button class="chip${base === 'orders' ? ' on' : ''}" data-b="orders">Суми замовлень</button></div>
+    ${deps ? '' : '<div class="hint" style="margin-top:6px">Щоб рахувати з виплат, завантажте ще раз щомісячні виписки Etsy — тепер з них беруться й рядки Deposit.</div>'}
+    <div class="goal-big" style="margin-top:16px"><b>${esc(U(taxOf(tot)))}</b><span>до сплати за ${taxCfg.year} · з доходу ${esc(U(tot))}</span></div>
+    <div class="hint" id="taxProg" style="margin-top:4px">${nbuBusy ? 'Завантажую курси НБУ…' : miss ? `⚠️ ${miss} надходж. без курсу (майбутня дата або немає інтернету) — не враховані.` : `${recs.length} надходжень${conv ? `, ${conv} з них перераховано за курсом НБУ на свою дату` : ''}.`}</div>
+    <div class="tax-wrap"><table class="tax"><tr><th>Квартал</th><th>Дохід</th><th>Податок ${rate}%</th>${extra ? `<th>Збір ${extra}%</th>` : ''}<th>Разом</th></tr>
+      ${Q.map((q, i) => `<tr><td>${i + 1} кв.<small class="muted"> · ${q.n}</small></td><td>${esc(U(q.inc))}</td><td>${esc(U(q.inc * rate / 100))}</td>${extra ? `<td>${esc(U(q.inc * extra / 100))}</td>` : ''}<td><b>${esc(U(taxOf(q.inc)))}</b></td></tr>`).join('')}
+      <tr class="tot"><td>Рік</td><td>${esc(U(tot))}</td><td>${esc(U(tot * rate / 100))}</td>${extra ? `<td>${esc(U(tot * extra / 100))}</td>` : ''}<td>${esc(U(taxOf(tot)))}</td></tr></table></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="taxCsv">⬇ CSV для бухгалтера</button></div>
+    <div class="tab-note" style="padding:12px 2px 0">Податок рахується з доходу за вашою ставкою, по кварталах. Що саме вважається доходом, залежить від вашої системи оподаткування — найчастіше це гроші, що надійшли на рахунок (виплати Etsy, рядки Deposit у виписці). Суми в інших валютах перераховуються за курсом НБУ на дату кожного надходження. Фіксовані внески (наприклад, ЄСВ) тут не враховано. Це оцінка — звірте з бухгалтером.</div>`;
+  return [html, () => {
+    const save = () => { ls.set('etsyTax', JSON.stringify(taxCfg)); renderMoney(); };
+    $('sheet').querySelectorAll('[data-y]').forEach(b => b.onclick = () => { taxCfg.year = +b.dataset.y; save(); });
+    $('sheet').querySelectorAll('[data-b]').forEach(b => b.onclick = () => { if (b.disabled) return; taxCfg.base = b.dataset.b; save(); });
+    $('sheet').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { taxCfg.cur = b.dataset.c; save(); });
+    $('taxRate').onchange = e => { taxCfg.rate = Math.max(0, Math.min(60, parseFloat(e.target.value) || 0)); save(); };
+    $('taxExtra').onchange = e => { taxCfg.extra = Math.max(0, Math.min(60, parseFloat(e.target.value) || 0)); save(); };
+    $('taxFop').onclick = () => { Object.assign(taxCfg, { rate:5, extra:1, cur:'UAH' }); save(); };
+    $('taxCsv').onclick = () => downloadCSV(['Date','Source','Shop','Amount','Currency','Rate (NBU)',`Amount ${rc}`,'Quarter'],
+      recs.map(r => { const k = fx(r.cur, r.t); return [isoDay(new Date(r.t)), r.src, r.shop, r.v.toFixed(2), r.cur, k != null && r.cur !== rc ? +k.toFixed(6) : '', k != null ? (r.v * k).toFixed(2) : '', Math.floor(new Date(r.t).getMonth() / 3) + 1]; }),
+      `tax-income-${taxCfg.year}-${rc}.csv`);
+  }];
+}
+
+// ================= export =================
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
+const csvCell = v => { let s = String(v ?? ''); if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+function downloadCSV(head, rows, name) {
+  download(new Blob(['\ufeff' + [head, ...rows].map(r => r.map(csvCell).join(',')).join('\n')], { type:'text/csv;charset=utf-8' }), name);
+  toast(`Експортовано ${rows.length} рядків.`, 3000);
+}
+function exportCSV() {
+  const vis = visibleEntries(); if (!vis.length) return toast('Немає замовлень для експорту.', 3000);
+  const head = ['Shop','Order ID','Date','Buyer','City','State','Country','Items','Listing IDs','Quantity','Total','Shipping','Currency','Repeat'];
+  const rows = vis.flatMap(e => e.orders.map(o => { const it = itemsOf(o); return [e.shop.name, o.id, o.date, privacy ? '' : o.buyer, e.place.city, e.place.state, e.place.country, it.map(i=>i.t).join(' | '), it.some(i=>i.id) ? it.map(i=>i.id||'').join(' | ') : '', o.itemsCount ?? '', o.total ?? '', o.shipping ?? '', o.currency, o.of > 1 ? (o.nth ? `${o.nth}/${o.of}` : 'yes') : '']; }));
+  const cell = v => { let s = String(v ?? ''); if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+  const csv = [head, ...rows].map(r => r.map(cell).join(',')).join('\n');
+  download(new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' }), `etsy-orders-${isoDay(new Date())}.csv`);
+  toast(`Експортовано ${rows.length} замовлень.`, 3000);
+}
+const loadImg = src => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+const svgToImg = el => { // rasterise an inline <svg> exactly as it is laid out on screen
+  const r = el.getBoundingClientRect(), cl = el.cloneNode(true);
+  cl.removeAttribute('style'); cl.setAttribute('xmlns','http://www.w3.org/2000/svg'); cl.setAttribute('width', r.width); cl.setAttribute('height', r.height);
+  return loadImg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(cl)));
+};
+async function exportPNG() {
+  toast('Готую зображення…');
+  const cont = map.getContainer(), box = cont.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.round(box.width), H = Math.round(box.height), F = 76;
+  const c = document.createElement('canvas'); c.width = W*dpr; c.height = (H+F)*dpr;
+  const dark = theme === 'dark', P = dark ? { bg:'#1b1b1d', foot:'#252322', fg:'#f4efe9', mut:'#a49c94', attr:'rgba(255,255,255,.6)' } : { bg:'#e8e4de', foot:'#fff', fg:'#1c1b1a', mut:'#6b6560', attr:'rgba(0,0,0,.55)' };
+  const x = c.getContext('2d'); x.scale(dpr, dpr); x.fillStyle = P.bg; x.fillRect(0, 0, W, H);
+  const at = el => { const r = el.getBoundingClientRect(); return [r.left - box.left, r.top - box.top, r.width, r.height]; };
+  cont.querySelectorAll('.leaflet-tile-pane img.leaflet-tile-loaded').forEach(img => { try { x.drawImage(img, ...at(img)); } catch {} });
+  cont.querySelectorAll('.leaflet-overlay-pane canvas').forEach(cv => { try { x.drawImage(cv, ...at(cv)); } catch {} });
+  for (const s of cont.querySelectorAll('.leaflet-overlay-pane svg')) { const im = await svgToImg(s); if (im) x.drawImage(im, ...at(s)); }
+  const icons = [...cont.querySelectorAll('.leaflet-marker-pane .leaflet-marker-icon')].sort((a,b) => (+a.style.zIndex||0) - (+b.style.zIndex||0));
+  for (const ic of icons) { const s = ic.querySelector('svg'); if (!s) continue; const im = await svgToImg(s); if (im) x.drawImage(im, ...at(s)); }
+  x.font = '11px system-ui,-apple-system,sans-serif'; x.fillStyle = P.attr; x.textAlign = 'right'; x.fillText('Tiles © Esri · Leaflet' + (display === 'regions' ? ' · Natural Earth' : ''), W - 8, H - 8);
+  // footer with shop branding and current numbers
+  x.fillStyle = P.foot; x.fillRect(0, H, W, F); x.fillStyle = '#f1641e'; x.fillRect(0, H, W, 3);
+  const vis = shops.filter(s => s.visible); let lx = 16;
+  const rr = (X, Y, w, h, r) => { x.beginPath(); x.roundRect ? x.roundRect(X, Y, w, h, r) : x.rect(X, Y, w, h); };
+  for (const s of vis.slice(0, 4)) {
+    const y = H + 18;
+    if (blurNames) { x.fillStyle = s.color; rr(lx, y, 40, 40, 11); x.fill(); }
+    else if (s.logo) { const im = await loadImg(s.logo); if (im) { x.save(); rr(lx, y, 40, 40, 11); x.clip(); x.drawImage(im, lx, y, 40, 40); x.restore(); } }
+    else { x.fillStyle = s.color; rr(lx, y, 40, 40, 11); x.fill(); x.fillStyle = '#fff'; x.font = '800 20px system-ui,sans-serif'; x.textAlign = 'center'; x.fillText((s.name.trim()[0]||'M').toUpperCase(), lx+20, y+27); }
+    lx += 46;
+  }
+  x.textAlign = 'left'; x.fillStyle = P.fg; x.font = '700 17px system-ui,-apple-system,sans-serif';
+  x.fillText(blurNames ? 'Карта замовлень Etsy' : (vis.map(s => s.name).join(' · ') || 'Карта замовлень'), lx + 6, H + 34);
+  x.fillStyle = P.mut; x.font = '13px system-ui,-apple-system,sans-serif';
+  x.fillText(`${$('kOrders').textContent} замовлень · ${$('kCities').textContent} міст · ${$('kCountries').textContent} країн · ${$('kRev').title || ''} · ${rangeLabel()}${filt.item ? ' · ' + filt.item.t : ''}`, lx + 6, H + 56);
+  try {
+    c.toBlob(b => { if (!b) return toast('Не вдалося створити зображення.', 4000); download(b, `etsy-map-${isoDay(new Date())}.png`); toast('Зображення збережено.', 2500); }, 'image/png');
+  } catch { toast('Браузер заблокував зображення мапи. Спробуйте ще раз після повного завантаження мапи.', 5000); }
+}
+
+// ================= backup / restore =================
+const BACKUP_APP = 'etsy-orders-geo';
+function exportBackup() {
+  const data = { app:BACKUP_APP, version:1, exported:new Date().toISOString(), shops: shops.map(s => ({ ...shopMeta(s), places:s.places, ledger:s.ledger || [] })), geo:cache };
+  const n = shops.reduce((t,s) => t + nOrders(s), 0);
+  download(new Blob([JSON.stringify(data)], { type:'application/json' }), `etsy-map-backup-${isoDay(new Date())}.json`);
+  toast(`💾 Збережено ${shops.length} магазин(и), ${n} замовлень. Файл містить імена покупців — зберігайте його приватно.`, 6000);
+}
+async function restoreBackup(data) {
+  if (!Array.isArray(data?.shops) || !data.shops.length) return toast('Це не резервна копія карти замовлень.', 4000);
+  const n = data.shops.reduce((t,s) => t + (s.places||[]).reduce((u,p) => u + (p.orders||[]).length, 0), 0);
+  if (!confirm(`Відновити дані з копії від ${fmtDate(data.exported)}?\n\nУ копії: ${data.shops.length} магазин(и), ${n} замовлень.\nПоточні магазини й замовлення буде замінено.`)) return;
+  for (const s of shops) { await kv.del('data:'+s.id); await kv.del('ledger:'+s.id); }
+  shops = data.shops.map(s => ({ ...s, places: s.places || [], ledger: s.ledger || [], visible: s.visible !== false, loading:false }));
+  for (const s of shops) { s.places.forEach(p => p.key ||= placeKey(p)); computeRepeat(s); await saveData(s); await kv.set('ledger:'+s.id, s.ledger); }
+  if (data.geo) { cache = { ...cache, ...data.geo }; kv.set('geo', cache); }
+  activeId = shops[0].id; saveShops(); closeSheet();
+  renderShops(); syncUploadLabel(); refresh(true);
+  toast(`📥 Відновлено ${shops.length} магазин(и), ${n} замовлень.`, 4000);
+}
+$('restoreFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { await restoreBackup(JSON.parse(await f.text())); } catch (err) { toast('Не вдалося прочитати файл: ' + err.message, 5000); }
+};
+
+// ================= read-only share link (data lives in the URL, compressed) =================
+const b64url = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); };
+const unb64url = s => Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0));
+const deflate = async str => new Uint8Array(await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+const inflate = async u8 => new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+async function smallLogo(src) {
+  if (!src) return ''; const im = await loadImg(src); if (!im) return '';
+  const c = document.createElement('canvas'); c.width = c.height = 40; c.getContext('2d').drawImage(im, 0, 0, 40, 40); return c.toDataURL('image/png');
+}
+async function shareLink() {
+  if (location.protocol === 'file:') return toast('Посилання працює лише з опублікованої сторінки (GitHub Pages), не з файлу на комп\'ютері.', 5000);
+  if (!window.CompressionStream) return toast('Цей браузер не вміє стискати дані для посилання. Спробуйте Chrome, Edge або Safari 16.4+.', 5000);
+  const vis = visibleEntries(); if (!vis.length) return toast('Немає замовлень для посилання.', 3000);
+  toast('Готую посилання…');
+  const curs = [], ci = c => { let i = curs.indexOf(c); if (i < 0) { curs.push(c); i = curs.length - 1; } return i; };
+  const out = []; let n = 0;
+  for (const s of shops) {
+    const mine = vis.filter(e => e.shop === s); if (!mine.length) continue;
+    out.push({ n:s.name, c:s.color, l: await smallLogo(s.logo), o: s.origin ? [+s.origin.lat.toFixed(2), +s.origin.lng.toFixed(2), s.origin.q] : null,
+      p: mine.map(e => { n += e.orders.length; return [+e.place.lat.toFixed(3), +e.place.lng.toFixed(3), e.place.city||'', e.place.state||'', e.place.country||'',
+        e.orders.map(o => { const t = Date.parse(o.date); return [isNaN(t) ? -1 : Math.floor(t / 864e5), o.total != null ? Math.round(o.total * 100) : -1, ci(o.currency||'USD'), o.of > 1 ? 1 : 0]; })]; }) });
+  }
+  const url = location.origin + location.pathname + '#v=' + b64url(await deflate(JSON.stringify({ v:1, cur:curs, s:out })));
+  const warn = url.length > 60000 ? ' Посилання дуже довге — деякі месенджери можуть його обрізати; звузьте період чи країни.' : '';
+  try { await navigator.clipboard.writeText(url); toast(`🔗 Посилання скопійовано: ${n} замовлень без імен, номерів і товарів.${warn}`, 7000); }
+  catch { toast(''); prompt('Скопіюйте посилання:', url); }
+}
+async function bootViewer(hash) {
+  const data = JSON.parse(await inflate(unb64url(hash)));
+  viewOnly = true; privacy = true; document.body.classList.add('viewer');
+  shops = data.s.map((s, i) => ({ id:'v'+i, name:s.n, color:s.c, logo:s.l || '', visible:true, loading:false,
+    origin: s.o ? { lat:s.o[0], lng:s.o[1], q:s.o[2] } : undefined,
+    places: s.p.map(p => ({ lat:p[0], lng:p[1], city:p[2], state:p[3], country:p[4], key:placeKey({ city:p[2], state:p[3], country:p[4] }),
+      orders: p[5].map(o => ({ id:'', date: o[0] >= 0 ? new Date(o[0] * 864e5 + 432e5).toISOString() : '', total: o[1] >= 0 ? o[1] / 100 : null, currency: data.cur[o[2]] || 'USD', items:[], itemsCount:null, buyer:'', nth:0, of: o[3] ? 2 : 0 })) })) }));
+  activeId = shops[0]?.id;
+  $('shopsTitle').textContent = 'Перегляд мапи';
+  document.title = shops.map(s => s.name).join(' · ') + ' · Карта замовлень';
+}
+window.addEventListener('hashchange', () => location.reload());
+
+// ================= loading orders into a shop (merges, no duplicates) =================
+const runs = {};
+async function loadInto(shop, rows) {
+  const run = (runs[shop.id] = (runs[shop.id]||0) + 1);
+  if (selected?.shop === shop) closeSheet();
+  shop.loading = 'Обробка файлу…'; shop.visible = true; renderShops();
+  // 1) rows → orders; rows of the same order (one row per item) are combined
+  const incoming = new Map(); let k = 0;
+  for (const n of rows.map(normalize)) {
+    if (!n.city && !n.country && n.lat == null) continue;
+    const key = n.order.id ? 'id:' + n.order.id : 'row:' + (k++);
+    const ex = incoming.get(key);
+    if (ex) { ex.order.items.push(...n.order.items); ex.order.itemsCount = (ex.order.itemsCount||0) + (n.order.itemsCount||0); if (n.order.itemLevel && n.order.total != null) ex.order.total = (ex.order.total||0) + n.order.total; }
+    else incoming.set(key, { loc:n, order:n.order });
+  }
+  // 2) merge into existing data: same order id → update, same signature without id → skip
+  const sig = o => [o.date, o.buyer, o.total].join('|');
+  const places = new Map(), byId = new Map(), sigs = new Set();
+  shop.places.forEach(p => { p.key ||= placeKey(p); places.set(p.key, p); p.orders.forEach(o => { if (o.id) byId.set(o.id, p); else sigs.add(sig(o)); }); });
+  let added = 0, updated = 0, dup = 0;
+  for (const { loc, order } of incoming.values()) {
+    let pk = placeKey(loc), place = places.get(pk);
+    if (!place) { place = { key:pk, city:loc.city, state:loc.state, country:loc.country, lat:loc.lat, lng:loc.lng, orders:[] }; places.set(pk, place); }
+    if (order.id && byId.has(order.id)) {
+      const old = byId.get(order.id), i = old.orders.findIndex(o => o.id === order.id), merged = mergeOrder(old.orders[i], order);
+      if (old === place) old.orders[i] = merged; else { old.orders.splice(i, 1); place.orders.push(merged); byId.set(order.id, place); }
+      updated++;
+    } else if (!order.id && sigs.has(sig(order))) dup++;
+    else { place.orders.push(order); if (order.id) byId.set(order.id, place); added++; }
+  }
+  shop.places = [...places.values()].filter(p => p.orders.length);
+  computeRepeat(shop); refresh(false);
+  // 3) geocode new cities
+  const todo = shop.places.filter(p => p.lat == null);
+  for (let i = 0; i < todo.length; i++) {
+    if (runs[shop.id] !== run) return;
+    const p = todo[i]; shop.loading = `Шукаю міста на мапі ${i+1}/${todo.length}…`; renderShops();
+    const c = await geocode(p); if (c) { p.lat = c[0]; p.lng = c[1]; }
+    if (i % 3 === 0 || i === todo.length-1) redraw(false);
+  }
+  if (runs[shop.id] !== run) return;
+  const lost = shop.places.filter(p => p.lat == null); const unplaced = lost.reduce((s,p) => s + p.orders.length, 0);
+  shop.places = shop.places.filter(p => p.lat != null);
+  computeRepeat(shop); shop.loading = false; await saveData(shop);
+  const parts = [`+${added} нових`]; if (updated) parts.push(`${updated} оновлено`); if (dup) parts.push(`${dup} дублів пропущено`); if (unplaced) parts.push(`${unplaced} не знайдено на мапі`);
+  toast(`«${shop.name}»: ${parts.join(', ')}.`, 6000);
+  renderShops(); refresh(true);
+}
+async function loadFile(f) {
+  if (viewOnly) return;
+  const t = await f.text(); let data;
+  try { data = f.name.toLowerCase().endsWith('.json') ? JSON.parse(t) : parseCSV(t); } catch (e) { return toast('Не вдалося прочитати файл: ' + e.message, 5000); }
+  if (data && !Array.isArray(data) && data.app === BACKUP_APP) return restoreBackup(data);
+  if (!Array.isArray(data) || !data.length) return toast('У файлі немає замовлень.', 4000);
+  if (isStatement(data)) return loadLedger(activeShop(), data);
+  return loadInto(activeShop(), data);
+}
+// several files at once (e.g. Sold Orders + Sold Order Items + statements): one after another,
+// so each merges into the result of the previous one and cities are geocoded once
+let fileQueue = Promise.resolve();
+function loadFiles(list) {
+  const files = [...(list || [])].filter(f => /\.(csv|json)$/i.test(f.name));
+  if (!files.length) return list?.length && toast('Підходять лише файли .csv або .json.', 4000);
+  files.forEach((f, i) => { fileQueue = fileQueue.then(() => { if (files.length > 1) toast(`Файл ${i+1} з ${files.length}: ${f.name}`, 2500); return loadFile(f); }).catch(e => toast('Помилка у файлі ' + f.name + ': ' + e.message, 5000)); });
+}
+$('file').onchange = e => { loadFiles(e.target.files); e.target.value=''; };
+document.body.ondragover = e => { e.preventDefault(); if (!viewOnly) document.body.classList.add('drop'); };
+document.body.ondragleave = e => { if (!e.relatedTarget) document.body.classList.remove('drop'); };
+document.body.ondrop = e => { e.preventDefault(); document.body.classList.remove('drop'); loadFiles(e.dataTransfer.files); };
+$('clear').onclick = () => { cache = {}; kv.set('geo', cache); toast('Кеш геокодингу очищено.', 2000); };
+
+// ================= instant tooltips: any element with data-tip =================
+const tipEl = document.createElement('div'); tipEl.id = 'tip'; document.body.appendChild(tipEl);
+const hideTip = () => tipEl.classList.remove('show');
+document.addEventListener('mouseover', e => {
+  const t = e.target.closest?.('[data-tip]'); if (!t) return hideTip();
+  tipEl.textContent = t.dataset.tip; tipEl.classList.add('show');
+  const r = t.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  tipEl.style.left = Math.max(6, Math.min(innerWidth - w - 6, r.left + r.width / 2 - w / 2)) + 'px';
+  tipEl.style.top = (r.top - h - 6 < 6 ? r.bottom + 6 : r.top - h - 6) + 'px';
+});
+document.addEventListener('scroll', hideTip, true);
+document.addEventListener('mouseleave', hideTip);
+document.addEventListener('click', e => { if (!e.target.closest?.('[data-tip]')) hideTip(); });
+
+// ================= install as an app (PWA) =================
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+async function installApp() {
+  if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) return toast('Карта вже відкрита як застосунок 👍', 3000);
+  if (installEvt) { installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); installEvt = null; if (r?.outcome === 'accepted') toast('Готово! Іконка з\'явиться серед застосунків.', 4000); return; }
+  const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const safari = /Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua);
+  toast(ios ? 'iPhone/iPad: Safari → кнопка «Поділитися» ⬆ → «На початковий екран».'
+    : safari ? 'Mac: у Safari меню «Файл» → «Додати в Dock».'
+    : /Firefox/.test(ua) ? 'Firefox не вміє встановлювати сайти як застосунки — відкрийте сторінку в Chrome, Edge чи Safari.'
+    : 'Chrome/Edge: значок встановлення праворуч в адресному рядку, або меню ⋮ → «Трансляція, збереження й поширення» → «Встановити сторінку як застосунок».', 9000);
+}
+
+// ================= boot =================
+(async function boot() {
+  const hash = location.hash.startsWith('#v=') ? location.hash.slice(3) : '';
+  if (hash) {
+    try { await bootViewer(hash); }
+    catch { toast('Посилання пошкоджене або обрізане. Попросіть автора надіслати його ще раз.', 8000); viewOnly = true; document.body.classList.add('viewer'); shops = []; }
+  } else {
+    let meta = await kv.get('shops');
+    if (!meta) { // move data from the older localStorage format into IndexedDB
+      let old = null; try { old = JSON.parse(ls.get('etsyShops') || 'null'); } catch {}
+      if (old?.length) {
+        let ok = true;
+        for (const s of old) { let d = []; try { d = JSON.parse(ls.get('etsyShopData:'+s.id) || '[]'); } catch {} ok = (await kv.set('data:'+s.id, d)) && ok; }
+        try { const g = JSON.parse(ls.get('etsyGeoCache') || 'null'); if (g) ok = (await kv.set('geo', g)) && ok; } catch {}
+        ok = (await kv.set('shops', old)) && ok;
+        if (ok) ['etsyShops','etsyGeoCache','etsyBrand', ...old.map(s => 'etsyShopData:'+s.id)].forEach(ls.del);
+        meta = old;
+      }
+    }
+    if (!meta?.length) {
+      let b = {}; try { b = JSON.parse(ls.get('etsyBrand') || '{}'); } catch {}
+      meta = [{ id:uid(), name:b.name || 'Мій Etsy-магазин', logo:b.logo || '', color:COLORS[0], visible:true }];
+    }
+    shops = meta;
+    for (const s of shops) { s.places = (await kv.get('data:'+s.id)) || []; s.ledger = (await kv.get('ledger:'+s.id)) || []; s.visible = s.visible !== false; s.loading = false; s.places.forEach(p => p.key ||= placeKey(p)); computeRepeat(s); }
+    cache = (await kv.get('geo')) || {};
+    activeId = shops[0].id; saveShops();
+  }
+  if (dispCur && !await loadRates()) { dispCur = ''; }
+  syncTopButtons(); renderShops(); syncUploadLabel(); renderRangeUI(); renderCurUI(); refresh(true);
+})();
+</script>
+</body>
+</html>
