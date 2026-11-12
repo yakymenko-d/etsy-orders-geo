@@ -156,6 +156,8 @@
   .order .mm { color:var(--muted); font-size:12.5px; overflow-wrap:anywhere; }
   .order .pr { font-weight:700; white-space:nowrap; text-align:right; }
   .order .pr small { display:block; color:var(--muted); font-weight:500; font-size:11.5px; }
+  .order .pr s.old { display:block; color:var(--muted); font-weight:500; font-size:12px; }
+  .order .pr .disc { display:inline-block; margin-top:3px; font-size:11px; font-weight:700; color:var(--good); background:color-mix(in srgb, var(--good) 15%, transparent); padding:1px 7px; border-radius:99px; }
   .badge { display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:99px; background:color-mix(in srgb, var(--c, var(--accent)) 16%, transparent); color:var(--c, var(--accent)); margin-left:4px; white-space:nowrap; }
   .empty { color:var(--muted); padding:16px 8px; text-align:center; }
 
@@ -213,7 +215,7 @@
   .danger-row { display:flex; gap:16px; padding:12px 0; margin-bottom:12px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 
   #toast { position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:1200; padding:9px 18px; font-size:13px; display:none; border-radius:99px; max-width:min(560px, 90vw); text-align:center; }
-  body.drop::after { content:"Відпустіть файл, щоб додати замовлення до вибраного магазину"; position:absolute; inset:0; z-index:2000; display:grid; place-items:center; text-align:center; padding:20px; font-size:22px; font-weight:700; background:rgba(241,100,30,.22); border:4px dashed var(--accent); }
+  body.drop::after { content:"Відпустіть файли, щоб додати замовлення до вибраного магазину"; position:absolute; inset:0; z-index:2000; display:grid; place-items:center; text-align:center; padding:20px; font-size:22px; font-weight:700; background:rgba(241,100,30,.22); border:4px dashed var(--accent); }
 
   /* read-only view opened from a shared link */
   body.viewer #addShop, body.viewer .shop .acts [data-a=up], body.viewer .shop .acts [data-a=edit], body.viewer .file-row,
@@ -294,7 +296,7 @@
       <button class="btn primary" id="uploadBtn">📂 Завантажити CSV / JSON</button>
       <button class="btn" id="clear" title="Очистити кеш геокодингу">Скинути кеш</button>
     </div>
-    <input id="file" type="file" accept=".csv,.json" hidden>
+    <input id="file" type="file" accept=".csv,.json" multiple hidden>
     <input id="restoreFile" type="file" accept=".json" hidden>
   </div>
 </div>
@@ -607,9 +609,9 @@ const num = v => { if (typeof v === 'number') return v; if (v === '' || v == nul
 function normalize(o) {
   // items → [{t: title, id: listing id}]; accepts the JSON from fetch-etsy.mjs, Etsy CSVs and this page's own CSV export
   let items = [];
-  // p = line price (price × quantity), q = quantity — used by the transactions list when the file has them
-  if (Array.isArray(o.items)) items = o.items.map(i => typeof i==='string' ? {t:i} : { t:i.title||i.t||'', id:String(i.listing_id||i.id||''), p: num(i.price ?? i.p), q: num(i.quantity ?? i.q) });
-  else if (pick(o,['item name','title'])) items = [{ t:pick(o,['item name','title']), id:String(pick(o,['listing id','listing_id'])), p: num(pick(o,['item total'])), q: num(pick(o,['quantity'])) }];
+  // p = line price before discount (price × quantity), d = discount on that line, q = quantity
+  if (Array.isArray(o.items)) items = o.items.map(i => typeof i==='string' ? {t:i} : { t:i.title||i.t||'', id:String(i.listing_id||i.id||''), p: num(i.price ?? i.p), d: num(i.discount ?? i.d), q: num(i.quantity ?? i.q) });
+  else if (pick(o,['item name','title'])) items = [{ t:pick(o,['item name','title']), id:String(pick(o,['listing id','listing_id'])), p: num(pick(o,['item total'])), d: num(pick(o,['discount amount'])), q: num(pick(o,['quantity'])) }];
   else if (pick(o,['items'])) { const ids = String(pick(o,['listing ids'])).split(' | '); items = String(o.items).split(' | ').map((t,i) => ({ t, id: ids[i] || '' })); }
   return {
     city: pick(o, ['city','ship city','shipping city']),
@@ -624,6 +626,8 @@ function normalize(o) {
       buyer: pick(o, ['full name','ship name','name','buyer']),
       total: num(pick(o, ['order total','order value','total','item total'])),
       itemLevel: !pick(o, ['order total','order value','total']) && !!pick(o, ['item total']),
+      // order-wide discount (coupon/sale) from "Sold Orders"; item rows carry their own in items[].d
+      discount: pick(o, ['order total','order value','total']) || !pick(o, ['item total']) ? num(pick(o, ['discount amount','discount','discount_amt'])) : null,
       shipping: num(pick(o, ['shipping','order shipping','shipping_cost'])),
       currency: pick(o, ['currency']) || 'USD',
     },
@@ -636,6 +640,7 @@ function mergeOrder(o, n) {
   if (n.items?.length) m.items = n.items;
   if (n.itemsCount != null) m.itemsCount = n.itemsCount;
   if (n.shipping != null) m.shipping = n.shipping;
+  if (n.discount != null) m.discount = n.discount;
   if (n.total != null && (!n.itemLevel || o.itemLevel || o.total == null)) { m.total = n.total; m.itemLevel = n.itemLevel; }
   return m;
 }
@@ -1193,7 +1198,15 @@ function renderList() {
     body = tx.slice(0, LIST_MAX).map(({ it, o, e }, i) => {
       const linePrice = it.p != null ? it.p : (itemsOf(o).length === 1 ? o.total : null);
       const meta = [fmtDate(o.date), [e.place.city, e.place.country].filter(Boolean).join(', '), o.id ? '#'+o.id : '', it.q > 1 ? `× ${it.q}` : ''].filter(Boolean).map(esc).join(' · ');
-      return `<div class="order" data-i="${i}" style="cursor:pointer"><div class="ic">🏷️</div><div class="mid"><div class="tt">${listingLink(it)}</div><div class="mm">${meta}</div></div><div class="pr">${priceHTML(linePrice, o.currency)}</div></div>`;
+      // discounted line: old price struck through, price actually paid, and the discount in %
+      // per-item discount if the file has it, otherwise the order's discount split by item price
+      const its = itemsOf(o), sumP = its.reduce((s, x) => s + (x.p || 0), 0);
+      const share = !its.some(x => x.d > 0) && o.discount > 0 && it.p > 0 && sumP > 0 ? o.discount * it.p / sumP : 0;
+      const disc = it.p != null ? Math.min(it.d > 0 ? it.d : share, it.p) : 0;
+      const price = disc
+        ? `<s class="old">${esc(fmtMoney(it.p, o.currency))}</s>${priceHTML(it.p - disc, o.currency)}<span class="disc">−${Math.round(disc / it.p * 100)}%</span>`
+        : priceHTML(linePrice, o.currency);
+      return `<div class="order" data-i="${i}" style="cursor:pointer"><div class="ic">🏷️</div><div class="mid"><div class="tt">${listingLink(it)}</div><div class="mm">${meta}</div></div><div class="pr">${price}</div></div>`;
     }).join('');
     pick = i => focusEntry(tx[i].e);
     note = tx.length ? 'Кожен проданий товар окремим рядком.' : (viewOnly ? 'Товари не передаються в посиланні для перегляду.' : 'Транзакції беруться з файлу «Sold Order Items».');
@@ -1506,12 +1519,20 @@ async function loadFile(f) {
   if (data && !Array.isArray(data) && data.app === BACKUP_APP) return restoreBackup(data);
   if (!Array.isArray(data) || !data.length) return toast('У файлі немає замовлень.', 4000);
   if (isStatement(data)) return loadLedger(activeShop(), data);
-  loadInto(activeShop(), data);
+  return loadInto(activeShop(), data);
 }
-$('file').onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value=''; };
+// several files at once (e.g. Sold Orders + Sold Order Items + statements): one after another,
+// so each merges into the result of the previous one and cities are geocoded once
+let fileQueue = Promise.resolve();
+function loadFiles(list) {
+  const files = [...(list || [])].filter(f => /\.(csv|json)$/i.test(f.name));
+  if (!files.length) return list?.length && toast('Підходять лише файли .csv або .json.', 4000);
+  files.forEach((f, i) => { fileQueue = fileQueue.then(() => { if (files.length > 1) toast(`Файл ${i+1} з ${files.length}: ${f.name}`, 2500); return loadFile(f); }).catch(e => toast('Помилка у файлі ' + f.name + ': ' + e.message, 5000)); });
+}
+$('file').onchange = e => { loadFiles(e.target.files); e.target.value=''; };
 document.body.ondragover = e => { e.preventDefault(); if (!viewOnly) document.body.classList.add('drop'); };
 document.body.ondragleave = e => { if (!e.relatedTarget) document.body.classList.remove('drop'); };
-document.body.ondrop = e => { e.preventDefault(); document.body.classList.remove('drop'); e.dataTransfer.files[0] && loadFile(e.dataTransfer.files[0]); };
+document.body.ondrop = e => { e.preventDefault(); document.body.classList.remove('drop'); loadFiles(e.dataTransfer.files); };
 $('clear').onclick = () => { cache = {}; kv.set('geo', cache); toast('Кеш геокодингу очищено.', 2000); };
 
 // ================= boot =================
