@@ -79,7 +79,10 @@
   .shop .acts .ib { width:30px; height:30px; }
   .shop .acts .ib:hover { color:var(--c); }
 
-  #kpis { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; flex:none; }
+  #kpis { display:grid; grid-template-columns:repeat(12, minmax(0,1fr)); gap:8px; flex:none; }
+  #kpis .kpi { grid-column:span 4; }
+  #kpis .kpi:nth-child(n+4) { grid-column:span 6; } /* money tiles two by two: revenue · cost of goods / Etsy costs · profit */
+  body.viewer #kpis .kpi:nth-child(4) { grid-column:span 12; }
   .neg { color:var(--danger) !important; }
   .pos { color:var(--good) !important; }
   .kpi { padding:10px 6px; text-align:center; border-radius:14px; min-width:0; cursor:pointer; transition:transform .15s, border-color .15s; display:flex; flex-direction:column; justify-content:center; }
@@ -170,6 +173,23 @@
   .order .pr { font-weight:700; white-space:nowrap; text-align:right; }
   .order .pr small { display:block; color:var(--muted); font-weight:500; font-size:11.5px; }
   .order .pr s.old { display:block; color:var(--muted); font-weight:500; font-size:12px; }
+  .order { flex-wrap:wrap; }
+  /* full width of the card, under the title and the price; the opened table stays inside the same rounded block */
+  details.om { flex:1 0 100%; margin-top:-2px; font-size:12.5px; background:var(--hover); border-radius:10px; overflow:hidden; }
+  details.om summary { cursor:pointer; color:var(--muted); list-style:none; display:flex; align-items:center; gap:6px; padding:5px 10px 5px 8px; white-space:nowrap; overflow:hidden; }
+  details.om summary:hover { color:var(--fg); }
+  details.om summary .tail { margin-left:auto; overflow:hidden; text-overflow:ellipsis; }
+  details.om summary::-webkit-details-marker { display:none; }
+  details.om summary .chev { flex:none; transition:transform .18s; }
+  details.om[open] summary .chev { transform:rotate(90deg); }
+  details.om summary b { color:var(--fg); }
+  details.om table { width:calc(100% - 20px); border-collapse:collapse; margin:2px 10px 8px; }
+  details.om td { padding:4px 2px; vertical-align:top; border-top:1px solid var(--line); }
+  details.om td:last-child { text-align:right; white-space:nowrap; font-weight:650; font-variant-numeric:tabular-nums; }
+  details.om td small { display:block; color:var(--muted); font-size:11px; }
+  details.om tr.mut td { color:var(--muted); }
+  details.om tr.sum td, details.om tr.tot td { font-weight:800; }
+  details.om tr.tot td { border-top:2px solid var(--line); }
   .order .pr .disc { display:inline-block; margin-top:3px; font-size:11px; font-weight:700; color:var(--good); background:color-mix(in srgb, var(--good) 15%, transparent); padding:1px 7px; border-radius:99px; }
   .badge.rv { background:color-mix(in srgb, #e0a800 18%, transparent); color:#b98a00; cursor:help; }
   :root[data-theme="dark"] .badge.rv { color:#f0c34a; }
@@ -197,7 +217,7 @@
   .lgd { display:flex; gap:12px; font-size:11.5px; color:var(--muted); margin-top:6px; flex-wrap:wrap; }
   .lgd b { display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:4px; vertical-align:-1px; }
   .tabs { display:flex; flex-wrap:wrap; gap:3px; margin:18px 0 6px; background:var(--hover); padding:3px; border-radius:12px; }
-  .tabs button { flex:1 0 auto; border:0; background:transparent; padding:6px 7px; border-radius:9px; cursor:pointer; font-size:12px; font-weight:600; color:var(--muted); white-space:nowrap; }
+  .tabs button { flex:1 0 auto; border:0; background:transparent; padding:6px 4px; border-radius:9px; cursor:pointer; font-size:12px; font-weight:600; color:var(--muted); white-space:nowrap; }
   .tabs button small { font-size:10.5px; }
   .tabs button.on { background:var(--solid); color:var(--fg); box-shadow:0 1px 3px rgba(0,0,0,.12); }
   .rk { position:relative; display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; cursor:pointer; overflow:hidden; margin-bottom:6px; }
@@ -374,8 +394,9 @@
     <div class="glass kpi"><b id="kCities">0</b><span>Міст</span><i id="dCities"></i></div>
     <div class="glass kpi"><b id="kCountries">0</b><span>Країн</span><i id="dCountries"></i></div>
     <div class="glass kpi"><b id="kRev">—</b><span>Дохід</span><i id="dRev"></i><em id="gRev" class="gbar"><u></u></em></div>
-    <div class="glass kpi own-only"><b id="kCosts">—</b><span>Витрати</span><i id="dCosts"></i></div>
-    <div class="glass kpi own-only"><b id="kProfit">—</b><span>Чистий прибуток</span><i id="dProfit"></i></div>
+    <div class="glass kpi own-only"><b id="kCogs">—</b><span>Собівартість</span><i id="dCogs"></i></div>
+    <div class="glass kpi own-only"><b id="kCosts">—</b><span>Витрати Etsy</span><i id="dCosts"></i></div>
+    <div class="glass kpi own-only" title="Чистий прибуток: дохід мінус витрати Etsy і собівартість"><b id="kProfit">—</b><span>Чистий прибуток</span><i id="dProfit"></i></div>
   </div>
 
   <div id="search" class="glass">
@@ -414,6 +435,7 @@
   <div class="glass" id="view"><button data-v="world" class="on">Світ</button><button data-v="usa">США</button></div>
   <div class="glass">
     <button class="ib" id="routesBtn" title="Маршрути від вашого міста до покупців"></button>
+    <button class="ib" id="listBtn" title="Деталі: замовлення, міста, країни, витрати"></button>
     <button class="ib" id="statsBtn" title="Статистика"></button>
     <button class="ib own-only" id="moneyBtn" title="Гроші: ціль, собівартість, знижки, податок"></button>
     <button class="ib" id="playTop" title="Таймлапс: як з'являлися замовлення"></button>
@@ -545,6 +567,7 @@ const ICON = {
   moon:   svg('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
   filter: svg('<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>'),
   chevron: svg('<path d="M6 15l6-6 6 6"/>'),
+  list:   svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 10h6M9 14h6M9 18h4"/>'),
   wallet: svg('<path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v3"/><path d="M3 6v12a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-3"/><path d="M21 12h-4a2 2 0 0 0 0 4h4z"/>'),
   play:   svg('<path d="M7 4.5v15l12.5-7.5z"/>'),
   pause:  svg('<path d="M8 5v14M16 5v14"/>'),
@@ -798,6 +821,7 @@ function normalize(o) {
       // order-wide discount (coupon/sale) from "Sold Orders"; item rows carry their own in items[].d
       discount: pick(o, ['order total','order value','total']) || !pick(o, ['item total']) ? num(pick(o, ['discount amount','discount','discount_amt'])) : null,
       shipping: num(pick(o, ['shipping','order shipping','shipping_cost'])),
+      tax: num(pick(o, ['sales tax','order sales tax','tax'])),
       currency: pick(o, ['currency']) || 'USD',
       coupon: pick(o, ['coupon code']) || '',
       couponInfo: pick(o, ['coupon details']) || '',
@@ -812,6 +836,7 @@ function mergeOrder(o, n) {
   if (n.items?.length) m.items = n.items;
   if (n.itemsCount != null) m.itemsCount = n.itemsCount;
   if (n.shipping != null) m.shipping = n.shipping;
+  if (n.tax != null) m.tax = n.tax;
   if (n.discount != null) m.discount = n.discount;
   if (n.total != null && (!n.itemLevel || o.itemLevel || o.total == null)) { m.total = n.total; m.itemLevel = n.itemLevel; }
   return m;
@@ -923,17 +948,35 @@ function cogsRows(entries) {
   entries.forEach(e => e.orders.forEach(o => itemsOf(o).forEach(it => { const c = unitCost(e.shop, it); if (c != null) out.push({ currency:o.currency || 'USD', v:c * (it.q || 1) }); })));
   return out;
 }
+// a total cost of goods for the whole shop (materials bought for all orders) is split evenly over all its orders,
+// so any period / filter gets its share: total × visible orders ÷ all orders
+const shopCogsTotal = s => s.cogsTotal?.v > 0 ? s.cogsTotal : null;
+const cogsPerOrder = s => { const t = shopCogsTotal(s), n = nOrders(s); return t && n ? t.v / n : 0; };
+function cogsLumpRows(entries) {
+  const by = new Map(); entries.forEach(e => { if (shopCogsTotal(e.shop)) by.set(e.shop, (by.get(e.shop) || 0) + e.orders.length); });
+  return [...by].map(([sh, n]) => ({ currency:sh.cogsTotal.cur || 'USD', v:cogsPerOrder(sh) * n }));
+}
+const hasCogs = () => shops.some(s => s.visible && (shopCogsTotal(s) || (s.costs && Object.keys(s.costs).length)));
 function financeOf(b) {
-  const rows = ledgerEntries(b), cogs = viewOnly ? [] : cogsRows(visibleEntries(b));
-  return { rows, cogs,
-    cost: moneyAgg([...rows.filter(r => r.cat !== 'sale').map(r => ({ currency:r.currency, v:-r.net })), ...cogs], 'v'),
+  const rows = ledgerEntries(b), vis = viewOnly ? [] : visibleEntries(b), cogs = viewOnly ? [] : [...cogsRows(vis), ...cogsLumpRows(vis)];
+  return { rows, cogs, cogsAgg: moneyAgg(cogs, 'v'),
+    cost: moneyAgg(rows.filter(r => r.cat !== 'sale').map(r => ({ currency:r.currency, v:-r.net })), 'v'),
     profit: moneyAgg([...rows.map(r => ({ currency:r.currency, v:r.net })), ...cogs.map(c => ({ currency:c.currency, v:-c.v }))], 'v') };
 }
 const fmtAgg = a => a.n ? fmtMoney(a.v, a.cur) + (a.miss ? '*' : '') : '—';
 const hasLedger = () => shops.some(s => s.visible && s.ledger?.length);
 const STATEMENT_HINT = 'Завантажте виписку Etsy: Shop Manager → Finances → Monthly statements → Download CSV';
 function updateFinanceKPIs(cb) {
-  const put = (id, a) => { const full = fmtAgg(a); $(id).textContent = full.length > 11 && a.n ? fmtCompact(a.v, a.cur) : full; $(id).title = full; };
+  const put = (id, a) => { const full = fmtAgg(a); $(id).textContent = full.length > 13 && a.n ? fmtCompact(a.v, a.cur) : full; $(id).title = full; };
+  const inv = d => d && { ...d, c: d.c === 'up' ? 'down' : d.c === 'down' ? 'up' : d.c }; // more costs = bad
+  // cost of goods tile works without a statement too
+  const fc = financeOf(rangeBounds());
+  if (!hasCogs() || !fc.cogsAgg.n) { $('kCogs').textContent = '—'; $('kCogs').title = 'Вкажіть собівартість: натисніть на плитку'; $('kCogs').classList.remove('neg'); showDelta('dCogs', null); }
+  else {
+    put('kCogs', fc.cogsAgg); const on = fc.cogsAgg.v > 0; $('kCogs').classList.toggle('neg', on);
+    if (on) { $('kCogs').textContent = '-' + $('kCogs').textContent; $('kCogs').title = '-' + $('kCogs').title; }
+    if (cb) { const pc = financeOf(cb).cogsAgg; showDelta('dCogs', fc.cogsAgg.cur === pc.cur || !pc.n ? inv(pctDelta(fc.cogsAgg.v, pc.n ? pc.v : 0)) : null, `Порівняно з ${boundsLabel(cb)}: ${fmtAgg(pc)}`); } else showDelta('dCogs', null);
+  }
   if (!hasLedger()) { ['kCosts','kProfit'].forEach(id => { $(id).textContent = '—'; $(id).title = STATEMENT_HINT; $(id).classList.remove('neg', 'pos'); }); showDelta('dCosts', null); showDelta('dProfit', null); return; }
   const f = financeOf(rangeBounds());
   put('kCosts', f.cost); put('kProfit', f.profit);
@@ -945,7 +988,6 @@ function updateFinanceKPIs(cb) {
   if (gain) { $('kProfit').textContent = '+' + $('kProfit').textContent; $('kProfit').title = '+' + $('kProfit').title; }
   if (cb) {
     const p = financeOf(cb), lbl = 'Порівняно з ' + boundsLabel(cb);
-    const inv = d => d && { ...d, c: d.c === 'up' ? 'down' : d.c === 'down' ? 'up' : d.c }; // more costs = bad
     showDelta('dCosts', f.cost.cur === p.cost.cur || !p.cost.n ? inv(pctDelta(f.cost.v, p.cost.n ? p.cost.v : 0)) : null, `${lbl}: ${fmtAgg(p.cost)}`);
     showDelta('dProfit', f.profit.cur === p.profit.cur || !p.profit.n ? pctDelta(f.profit.v, p.profit.n ? p.profit.v : 0) : null, `${lbl}: ${fmtAgg(p.profit)}`);
   } else { showDelta('dCosts', null); showDelta('dProfit', null); }
@@ -1148,7 +1190,7 @@ let heatLayer = null;
 let display = ['pins','groups','heat','regions'].includes(ls.get('etsyDisplay')) ? ls.get('etsyDisplay') : 'groups';
 let routesOn = ls.get('etsyRoutes') === '1';
 let selected = null, sheet = null; // sheet: 'place' | 'stats' | 'list'
-const KPI_TABS = ['orders','cities','countries','tx','costs','costs']; let listTab = 'orders';
+const KPI_TABS = ['orders','cities','countries','orders','cogs','costs','profit']; let listTab = 'orders', profitSort = 'date';
 
 function pinIcon(count, sel, color, shiftX) {
   const w = Math.round(Math.min(48, 28 + Math.sqrt(count)*4)), h = Math.round(w*1.5);
@@ -1323,6 +1365,7 @@ document.querySelectorAll('#modes button').forEach(b => {
 });
 function syncTopButtons() {
   $('routesBtn').innerHTML = ICON.route; $('routesBtn').classList.toggle('on', routesOn);
+  $('listBtn').innerHTML = ICON.list; $('listBtn').classList.toggle('on', sheet === 'list');
   $('statsBtn').innerHTML = ICON.stats; $('statsBtn').classList.toggle('on', sheet === 'stats');
   $('moneyBtn').innerHTML = ICON.wallet; $('moneyBtn').classList.toggle('on', sheet === 'money');
   $('playTop').innerHTML = playTimer ? ICON.pause : ICON.play; $('playTop').classList.toggle('on', !!tl);
@@ -1333,7 +1376,7 @@ function syncTopButtons() {
   $('toggleFilters').innerHTML = ICON.filter;
   $('themeBtn').innerHTML = theme === 'dark' ? ICON.sun : ICON.moon;
   $('themeBtn').title = theme === 'dark' ? 'Світла тема' : 'Темна тема';
-  document.querySelectorAll('#kpis .kpi').forEach((el, i) => el.classList.toggle('on', goalTile(i) ? sheet === 'money' && moneyTab === 'goal' : sheet === 'list' && listTab === KPI_TABS[i]));
+  document.querySelectorAll('#kpis .kpi').forEach((el, i) => el.classList.toggle('on', goalTile(i) ? sheet === 'money' && moneyTab === 'goal' : KPI_TABS[i] === 'cogs' ? sheet === 'money' && moneyTab === 'margin' : sheet === 'list' && listTab === KPI_TABS[i]));
   $('q').placeholder = privacy ? 'Пошук міста, штату чи країни' : 'Пошук міста, країни чи покупця';
 }
 $('routesBtn').onclick = () => {
@@ -1342,6 +1385,7 @@ $('routesBtn').onclick = () => {
 };
 $('privacyBtn').onclick = () => { privacy = !privacy; ls.set('etsyPrivacy', privacy ? '1' : '0'); syncTopButtons(); refresh(false); toast(privacy ? '🔒 Імена покупців сховані — можна показувати мапу іншим.' : 'Імена покупців знову видно.', 3000); };
 $('statsBtn').onclick = () => sheet === 'stats' ? closeSheet() : openStats();
+$('listBtn').onclick = () => sheet === 'list' ? closeSheet() : openList(listTab || 'orders');
 $('moneyBtn').onclick = () => sheet === 'money' ? closeSheet() : openMoney();
 $('playTop').onclick = () => togglePlay();
 $('themeBtn').onclick = () => {
@@ -1377,7 +1421,7 @@ function openPlace(e, pan=true) {
   const sorted = [...e.orders].sort((a,b) => (Date.parse(b.date)||0) - (Date.parse(a.date)||0));
   const dates = e.orders.map(o=>Date.parse(o.date)).filter(Boolean).sort((a,b)=>a-b);
   const dist = shop.origin ? distKm([shop.origin.lat, shop.origin.lng], [p.lat, p.lng]) : null;
-  const rows = sorted.map(o => orderRow(o)).join('');
+  const rows = sorted.map(o => orderRow(o, null, null, shop)).join('');
   $('sheet').innerHTML = `
     <div class="m-head"><div class="m-pin">📍</div>
       <div style="flex:1;min-width:0"><div class="m-title">${esc(p.city||'Невідоме місто')}</div><div class="m-sub">${esc([p.state,p.country].filter(Boolean).join(', '))}${dist!=null ? ` · 📦 ~${fmtKm(dist)}` : ''}</div>
@@ -1402,39 +1446,77 @@ function priceHTML(v, cur) {
   const cv = dispCur && rates && cur !== dispCur ? conv(v, cur) : null;
   return esc(fmtMoney(v, cur)) + (cv != null ? `<small>≈ ${esc(fmtMoney(cv, dispCur))}</small>` : '');
 }
+// ---- money of one order: what the buyer paid → tax → Etsy fees from the statement → cost of goods → what is left ----
+let ledIdxKey = '', ledIdx = new Map();
+function ledgerByOrder() { // statement rows grouped by order id (rebuilt only when statements change)
+  const key = shops.map(s => s.id + ':' + (s.ledger?.length || 0)).join();
+  if (key !== ledIdxKey) { ledIdxKey = key; ledIdx = new Map(); shops.forEach(s => (s.ledger || []).forEach(r => { if (r.orderId && r.cat !== 'deposit') { if (!ledIdx.has(r.orderId)) ledIdx.set(r.orderId, []); ledIdx.get(r.orderId).push(r); } })); }
+  return ledIdx;
+}
+const isBuyerTax = r => r.cat === 'tax' && /sales tax|paid by buyer|collected/i.test(r.title + ' ' + r.type);
+function orderMoney(o, shop) {
+  if (o.total == null) return null;
+  const cur = o.currency || 'USD', rows = (ledgerByOrder().get(o.id) || []).filter(r => (r.currency || 'USD') === cur);
+  const lTax = rows.filter(isBuyerTax), tax = lTax.length ? Math.abs(lTax.reduce((t, r) => t + r.net, 0)) : (o.tax > 0 ? o.tax : 0);
+  const fees = new Map(); rows.forEach(r => { if (r.cat === 'sale' || isBuyerTax(r)) return; fees.set(r.cat, (fees.get(r.cat) || 0) + r.net); });
+  const lump = shop && shopCogsTotal(shop) && (shop.cogsTotal.cur || 'USD') === cur ? cogsPerOrder(shop) : 0;
+  const cogs = lump + (shop ? itemsOf(o).reduce((t, it) => { const c = unitCost(shop, it); return c == null ? t : t + c * (it.q || 1); }, 0) : 0);
+  const revenue = o.total - tax, feeSum = [...fees.values()].reduce((t, v) => t + v, 0);
+  return { cur, total:o.total, tax, revenue, shipping:o.shipping, fees, feeSum, cogs, lump, left: revenue + feeSum - cogs, hasLedger: rows.length > 0 };
+}
+function moneyHTML(o, shop) {
+  const m = !viewOnly && orderMoney(o, shop); if (!m) return '';
+  const F = v => esc(fmtMoney(v, m.cur)), line = (l, v, cls = '', sub = '') => `<tr class="${cls}"><td>${l}${sub ? `<small>${sub}</small>` : ''}</td><td>${v}</td></tr>`;
+  let t = line('Покупець заплатив', F(m.total));
+  if (m.tax) t += line('− Податок з продажу', '−' + F(m.tax), 'mut', 'платить покупець, Etsy перераховує державі');
+  t += line('= Ваш дохід', F(m.revenue), 'sum', m.shipping ? `з них доставка ${F(m.shipping)}` : '');
+  if (m.hasLedger) [...m.fees].sort((a, b) => a[1] - b[1]).forEach(([c, v]) => { if (Math.abs(v) >= .005) t += line((v < 0 ? '− ' : '+ ') + esc(COST_CATS[c] || c), (v < 0 ? '−' : '+') + F(Math.abs(v)), v < 0 ? 'neg' : 'pos'); });
+  else t += line('− Комісії Etsy', '?', 'mut', hasLedger() ? 'цього замовлення немає у завантажених виписках' : 'завантажте місячну виписку Etsy');
+  if (m.cogs) t += line('− Собівартість', '−' + F(m.cogs), 'neg', m.lump ? 'частка загальної суми собівартості' : '');
+  t += line('= Вам лишилось', F(m.left), 'tot ' + (m.left >= 0 ? 'pos' : 'neg'));
+  const short = m.hasLedger ? `комісії −${F(Math.abs(m.feeSum))}` : 'без комісій';
+  return `<details class="om"><summary><svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>Вам лишилось <b class="${m.left >= 0 ? 'pos' : 'neg'}">${F(m.left)}</b><span class="tail">${short}</span></summary><table>${t}</table></details>`;
+}
+// order sum; with a discount: the sum without it struck through, the paid sum and the discount in % of the items' price
+function orderPriceHTML(o) {
+  const disc = o.total != null ? orderDiscount(o) : 0;
+  if (!(disc > 0)) return priceHTML(o.total, o.currency);
+  const items = itemsOf(o).reduce((t, it) => t + (it.p || 0), 0), base = items > disc ? items : o.total + disc;
+  return `<s class="old">${esc(fmtMoney(o.total + disc, o.currency))}</s>${priceHTML(o.total, o.currency)}<span class="disc">−${Math.round(disc / base * 100)}%</span>`;
+}
 // one order; with `place` the city is shown too (lists across many cities); `i` makes the row clickable
-function orderRow(o, place, i) {
+function orderRow(o, place, i, shop, m) {
   const items = itemsOf(o);
   const titles = items.length ? items.map(listingLink).join('<br>') : esc(o.itemsCount ? `${o.itemsCount} товар(ів)` : 'Замовлення');
   const meta = [place ? '📍 ' + [place.city, place.country].filter(Boolean).join(', ') : '', !privacy && o.buyer ? '👤 '+o.buyer : '', fmtDate(o.date), o.id ? '#'+o.id : ''].filter(Boolean).map(esc).join(' · ');
   const rep = (o.of > 1 ? `<span class="badge" title="Повторний покупець">🔁 ${o.nth ? `${o.nth}-ге з ${o.of}` : 'повторний'}</span>` : '')
     + (o.review ? `<span class="badge rv" data-tip="${esc(o.review.m ? (o.review.m.length > 140 ? o.review.m.slice(0, 140) + '…' : o.review.m) : 'Відгук без тексту')}">★ ${o.review.s}</span>` : '');
-  return `<div class="order"${i != null ? ` data-i="${i}" style="cursor:pointer"` : ''}><div class="ic">🛍️</div><div class="mid"><div class="tt">${titles}</div><div class="mm">${meta}${rep}</div></div><div class="pr">${priceHTML(o.total, o.currency)}</div></div>`;
+  return `<div class="order"${i != null ? ` data-i="${i}" style="cursor:pointer"` : ''}><div class="ic">🛍️</div><div class="mid"><div class="tt">${titles}</div><div class="mm">${meta}${rep}</div></div><div class="pr">${m ? `<span class="${m.left >= 0 ? 'pos' : 'neg'}">${m.left > 0 ? '+' : ''}${esc(fmtMoney(m.left, m.cur))}</span><small>з ${esc(fmtMoney(m.total, m.cur))}${m.hasLedger ? '' : ' · без комісій'}</small>` : orderPriceHTML(o)}</div>${moneyHTML(o, shop)}</div>`;
 }
 const rankHTML = rows => rows.length ? rows.map((r,i) => `<div class="rk${r.on?' on':''}" data-i="${i}"><div class="bar" style="width:${r.share*100}%"></div><span class="no">${i+1}</span><span class="nm">${r.name}${r.sub ? `<small>${r.sub}</small>` : ''}</span><span class="vl">${r.val}${r.rev ? `<small>${esc(r.rev)}</small>` : ''}</span></div>`).join('') : '<div class="empty">Немає даних</div>';
 function focusEntry(e) { map.setView([e.place.lat, e.place.lng], Math.max(map.getZoom(), 7)); openPlace(e, false); }
 
 // ================= right sheet: details behind the KPI tiles =================
 const LIST_MAX = 300;
-const goalTile = i => i === 3 && !viewOnly && goal.amount > 0; // with a revenue goal the revenue tile opens Гроші → Ціль
+const goalTile = i => i === 3 && !viewOnly; // the revenue tile opens Гроші → Ціль (there you can also set a goal)
 document.querySelectorAll('#kpis .kpi').forEach((el, i) => el.onclick = () => {
   if (goalTile(i)) { if (sheet === 'money' && moneyTab === 'goal') return closeSheet(); moneyTab = 'goal'; ls.set('etsyMoneyTab', moneyTab); return sheet === 'money' ? renderMoney() : openMoney(); }
+  if (KPI_TABS[i] === 'cogs') { if (sheet === 'money' && moneyTab === 'margin') return closeSheet(); moneyTab = 'margin'; ls.set('etsyMoneyTab', moneyTab); return sheet === 'money' ? renderMoney() : openMoney(); }
   sheet === 'list' && listTab === KPI_TABS[i] ? closeSheet() : openList(KPI_TABS[i]);
 });
 function openList(tab) { pausePlay(); listTab = tab; if (selected) { selected = null; redraw(false); } openSheet('list'); renderList(); }
 function renderList() {
   const vis = visibleEntries();
   const orders = vis.flatMap(e => e.orders.map(o => ({ o, e }))).sort((a,b) => (Date.parse(b.o.date)||0) - (Date.parse(a.o.date)||0));
-  const tx = orders.flatMap(({ o, e }) => itemsOf(o).map(it => ({ it, o, e })));
   const cityMap = new Map(); vis.forEach(e => { const k = placeKey(e.place); if (!cityMap.has(k)) cityMap.set(k, { e, orders:[] }); const c = cityMap.get(k); c.orders.push(...e.orders); if (e.orders.length > c.e.orders.length) c.e = e; });
   const cities = [...cityMap.values()].sort((a,b) => b.orders.length - a.orders.length);
   const ctryMap = new Map(); vis.forEach(e => { const k = e.place.country||'—'; if (!ctryMap.has(k)) ctryMap.set(k, { c:k, orders:[], cities:new Set() }); ctryMap.get(k).orders.push(...e.orders); ctryMap.get(k).cities.add(placeKey(e.place)); });
   const countries = [...ctryMap.values()].sort((a,b) => b.orders.length - a.orders.length);
   const ledgerRows = viewOnly ? [] : ledgerEntries().sort((a,b) => Date.parse(b.date) - Date.parse(a.date));
-  const TABS = [['orders','Замовлення',orders.length],['cities','Міста',cities.length],['countries','Країни',countries.length],['tx','Транзакції',tx.length], ...(viewOnly ? [] : [['costs','Витрати',ledgerRows.length]])];
+  const TABS = [['orders','Замовлення',orders.length],['cities','Міста',cities.length],['countries','Країни',countries.length], ...(viewOnly ? [] : [['costs','Витрати',ledgerRows.length],['profit','Прибуток',orders.length]])];
   let body = '', pick = () => {}, total = 0, note = '';
   if (listTab === 'orders') {
-    total = orders.length; body = orders.slice(0, LIST_MAX).map((x, i) => orderRow(x.o, x.e.place, i)).join('');
+    total = orders.length; body = orders.slice(0, LIST_MAX).map((x, i) => orderRow(x.o, x.e.place, i, x.e.shop)).join('');
     pick = i => focusEntry(orders[i].e);
   } else if (listTab === 'cities') {
     total = cities.length; const mx = cities[0]?.orders.length || 1;
@@ -1445,6 +1527,22 @@ function renderList() {
     body = rankHTML(countries.map(x => ({ name:esc(x.c), sub:`${x.cities.size} міст`, val:x.orders.length, rev:sumMoney(x.orders), share:x.orders.length/mx, on:filt.countries.has(x.c) })));
     pick = i => { filt.countries = new Set([countries[i].c]); refresh(true); };
     note = 'Натисніть на країну, щоб показати на мапі лише її.';
+  } else if (listTab === 'profit') {
+    // every order with what is left of it after tax, Etsy fees and cost of goods
+    const list = orders.map(x => ({ ...x, m:orderMoney(x.o, x.e.shop) })).filter(x => x.m);
+    if (profitSort === 'low') list.sort((a,b) => a.m.left - b.m.left); else if (profitSort === 'high') list.sort((a,b) => b.m.left - a.m.left);
+    total = list.length;
+    const left = moneyAgg(list.map(x => ({ currency:x.m.cur, v:x.m.left })), 'v'), loss = list.filter(x => x.m.left < 0).length, noFees = list.filter(x => !x.m.hasLedger).length;
+    const avg = left.n ? left.v / left.n : 0;
+    body = `<div class="st-grid" style="padding:0 6px 10px">
+        <div class="m-stat"><b class="${left.v >= 0 ? 'pos' : 'neg'}">${left.v > 0 ? '+' : ''}${esc(fmtAgg(left))}</b><span>Лишилось разом</span></div>
+        <div class="m-stat"><b class="${avg >= 0 ? 'pos' : 'neg'}">${left.n ? (avg > 0 ? '+' : '') + esc(fmtMoney(avg, left.cur)) : '—'}</b><span>Сер. з замовлення</span></div>
+        <div class="m-stat"><b class="${loss ? 'neg' : ''}">${loss}</b><span>Збиткових</span></div>
+        <div class="m-stat"><b>${noFees}</b><span>Без комісій у виписках</span></div></div>
+      <div class="chips" style="padding:0 6px 10px">${[['date','Нові спочатку'],['low','↑ Найменше'],['high','↓ Найбільше']].map(([k,l]) => `<button class="chip${profitSort === k ? ' on' : ''}" data-ps="${k}">${l}</button>`).join('')}</div>`
+      + list.slice(0, LIST_MAX).map((x, i) => orderRow(x.o, x.e.place, i, x.e.shop, x.m)).join('');
+    pick = i => focusEntry(list[i].e);
+    note = 'Що лишається з кожного замовлення після податку, комісій Etsy і собівартості. Плитка «Чистий прибуток» трохи інша: у ній ще збори без замовлення (лістинги, Etsy Ads).';
   } else if (listTab === 'costs') {
     total = ledgerRows.length;
     if (!hasLedger()) {
@@ -1452,31 +1550,15 @@ function renderList() {
     } else {
       const f = financeOf(rangeBounds());
       const byCat = new Map(); ledgerRows.filter(r => r.cat !== 'sale').forEach(r => { if (!byCat.has(r.cat)) byCat.set(r.cat, []); byCat.get(r.cat).push({ currency:r.currency, v:-r.net }); });
-      if (f.cogs.length) byCat.set('cogs', f.cogs);
       const cats = [...byCat].map(([c, list]) => ({ c, a:moneyAgg(list, 'v') })).filter(x => Math.abs(x.a.v) >= .005).sort((a,b) => b.a.v - a.a.v);
       const mx = Math.max(.01, ...cats.map(x => Math.abs(x.a.v)));
-      body = `<div class="st-grid" style="padding:0 6px 10px"><div class="m-stat"><b class="${f.cost.n && f.cost.v > 0 ? 'neg' : ''}">${f.cost.n && f.cost.v > 0 ? '-' : ''}${esc(fmtAgg(f.cost))}</b><span>Витрати</span></div><div class="m-stat"><b class="${f.profit.n && f.profit.v < 0 ? 'neg' : f.profit.n && f.profit.v > 0 ? 'pos' : ''}">${f.profit.n && f.profit.v > 0 ? '+' : ''}${esc(fmtAgg(f.profit))}</b><span>Чистий прибуток</span></div></div>`
+      body = `<div class="st-grid" style="padding:0 6px 10px"><div class="m-stat"><b class="${f.cost.n && f.cost.v > 0 ? 'neg' : ''}">${f.cost.n && f.cost.v > 0 ? '-' : ''}${esc(fmtAgg(f.cost))}</b><span>Витрати Etsy</span></div>${f.cogsAgg.n ? `<div class="m-stat"><b class="neg">-${esc(fmtAgg(f.cogsAgg))}</b><span>Собівартість</span></div>` : ''}</div>`
         + rankHTML(cats.map(x => ({ name:esc(COST_CATS[x.c] || x.c), val:esc(fmtMoney(x.a.v, x.a.cur)), share:Math.abs(x.a.v)/mx })))
         + `<div class="m-h">Рядки виписки</div>`
         + ledgerRows.slice(0, LIST_MAX).map(r => `<div class="order"><div class="ic">${r.cat === 'sale' ? '💰' : '🧾'}</div><div class="mid"><div class="tt">${esc(r.title || r.type)}</div><div class="mm">${esc([fmtDate(r.date), r.type, r.info].filter(Boolean).join(' · '))}</div></div><div class="pr${r.net < 0 ? ' neg' : r.net > 0 ? ' pos' : ''}">${r.net > 0 ? '+' : ''}${priceHTML(r.net, r.currency)}</div></div>`).join('');
-      note = 'З виписки Etsy. Прибуток = продажі мінус комісії, реклама, етикетки й повернення' + (f.cogs.length ? ' та собівартість товарів (💰 Гроші → Собівартість).' : '. Собівартість товарів можна додати в 💰 Гроші → Собівартість.')
+      note = 'З виписки Etsy. Прибуток = продажі мінус комісії, реклама, етикетки й повернення' + (f.cogs.length ? ' та мінус собівартість.' : '. Собівартість можна додати, натиснувши на плитку «Собівартість».')
         + (filt.q || filt.countries.size || filt.repeat || filt.item ? ' З активними фільтрами враховано лише збори, пов\'язані з видимими замовленнями.' : '');
     }
-  } else {
-    total = tx.length;
-    body = tx.slice(0, LIST_MAX).map(({ it, o, e }, i) => {
-      const linePrice = it.p != null ? it.p : (itemsOf(o).length === 1 ? o.total : null);
-      const meta = [fmtDate(o.date), [e.place.city, e.place.country].filter(Boolean).join(', '), o.id ? '#'+o.id : '', it.q > 1 ? `× ${it.q}` : ''].filter(Boolean).map(esc).join(' · ');
-      // discounted line: old price struck through, price actually paid, and the discount in %
-      // per-item discount if the file has it, otherwise the order's discount split by item price
-      const disc = linePaid(it, o).disc;
-      const price = disc
-        ? `<s class="old">${esc(fmtMoney(it.p, o.currency))}</s>${priceHTML(it.p - disc, o.currency)}<span class="disc">−${Math.round(disc / it.p * 100)}%</span>`
-        : priceHTML(linePrice, o.currency);
-      return `<div class="order" data-i="${i}" style="cursor:pointer"><div class="ic">🏷️</div><div class="mid"><div class="tt">${listingLink(it)}</div><div class="mm">${meta}</div></div><div class="pr">${price}</div></div>`;
-    }).join('');
-    pick = i => focusEntry(tx[i].e);
-    note = tx.length ? 'Кожен проданий товар окремим рядком.' : (viewOnly ? 'Товари не передаються в посиланні для перегляду.' : 'Транзакції беруться з файлу «Sold Order Items».');
   }
   if (!body) body = '<div class="empty">Немає даних для цих фільтрів</div>';
   if (total > LIST_MAX) note = `Показано перші ${LIST_MAX} з ${total}. Звузьте період або країни, щоб побачити решту.` + (note ? ' ' + note : '');
@@ -1489,7 +1571,8 @@ function renderList() {
     <div class="m-list" id="lsList" style="padding-top:8px"><div class="rk-list">${body}</div></div>`;
   $('mClose').onclick = closeSheet;
   $('sheet').querySelectorAll('.tabs button').forEach(b => b.onclick = () => { listTab = b.dataset.t; renderList(); syncTopButtons(); });
-  $('lsList').onclick = ev => { if (ev.target.closest('a')) return; const r = ev.target.closest('[data-i]'); if (r) pick(+r.dataset.i); };
+  $('lsList').onclick = ev => { if (ev.target.closest('a, details, [data-ps]')) return; const r = ev.target.closest('[data-i]'); if (r) pick(+r.dataset.i); };
+  $('sheet').querySelectorAll('[data-ps]').forEach(b => b.onclick = () => { profitSort = b.dataset.ps; renderList(); });
 }
 
 // ================= right sheet: statistics =================
@@ -1895,7 +1978,19 @@ function itemStats(entries) {
 }
 function marginHTML() {
   const list = itemStats(visibleEntries()).slice(0, 150);
-  if (!list.length) return ['<div class="empty">Тут з\'являться товари з файлу «Sold Order Items». Для кожного вкажете собівартість однієї штуки — і побачите реальний прибуток і маржу.</div>'];
+  // total cost of goods per visible shop (one sum for all orders)
+  const vs = shops.filter(s => s.visible), curOf = sh => sh.cogsTotal?.cur || moneyAgg(sh.places.flatMap(p => p.orders)).cur || 'USD';
+  const totalHTML = `<div class="lbl" style="margin-top:4px">Загальна собівартість</div>
+    <div class="tab-note" style="padding:0 2px 8px">Скільки ви всього витратили на матеріали, друк і пакування для всіх замовлень. Сума ділиться порівну на всі замовлення магазину, тож для будь-якого періоду віднімається його частка — у плитці «Собівартість» і в «Чистому прибутку».</div>
+    ${vs.map((sh, i) => `<div class="mg"><div class="mid"><div class="tt"><span class="sn">${esc(sh.name)}</span></div><div class="mm">${nOrders(sh)} замовлень${shopCogsTotal(sh) && nOrders(sh) ? ` · ${esc(fmtMoney(cogsPerOrder(sh), curOf(sh)))} на замовлення` : ''}</div></div>
+      <label class="money-in" title="Загальна собівартість"><span>${esc(curSymbol(curOf(sh)))}</span><input type="number" min="0" step="1" inputmode="decimal" data-tot="${i}" placeholder="напр. 500" value="${shopCogsTotal(sh) ? sh.cogsTotal.v : ''}" style="width:90px"></label></div>`).join('')}
+    <div class="lbl">Або по товарах — за 1 штуку</div>`;
+  const bindTotal = () => $('sheet').querySelectorAll('[data-tot]').forEach(inp => inp.onchange = () => {
+    const sh = vs[+inp.dataset.tot], v = parseFloat(inp.value);
+    if (!(v > 0)) delete sh.cogsTotal; else sh.cogsTotal = { v:Math.round(v * 100) / 100, cur:curOf(sh) };
+    saveShops(); updateFinanceKPIs(compareBounds()); renderMoney();
+  });
+  if (!list.length) return [totalHTML + '<div class="empty">Тут з\'являться товари з файлу «Sold Order Items». Для кожного можна вказати собівартість однієї штуки — і побачити реальний прибуток і маржу.</div>', bindTotal];
   const many = shops.filter(s => s.visible).length > 1;
   const res = x => { const c = unitCost(x.shop, x.it); if (c == null) return '<span class="muted">—</span>'; const pr = x.rev - c * x.units, mg = x.rev ? pr / x.rev : 0; return `<b class="${pr >= 0 ? 'pos' : 'neg'}">${pr >= 0 ? '+' : ''}${esc(fmtMoney(pr, x.cur))}</b><small>маржа ${Math.round(mg * 100)}%</small>`; };
   const sum = () => {
@@ -1911,9 +2006,10 @@ function marginHTML() {
       <div class="mm">${many ? `<span class="sn">${esc(x.shop.name)}</span> · ` : ''}${x.units} шт. · ${esc(fmtMoney(x.rev, x.cur))}${x.miss ? ` · ${x.miss} без ціни` : ''}</div></div>
       <label class="money-in sm" title="Собівартість 1 шт."><span>${esc(curSymbol(x.cur))}</span><input type="number" min="0" step="0.01" inputmode="decimal" data-i="${i}" placeholder="за 1 шт." value="${unitCost(x.shop, x.it) ?? ''}"></label>
       <div class="mg-r" id="mgR${i}">${res(x)}</div></div>`).join('');
-  return [`<div class="tab-note" style="padding:0 2px 10px">Вкажіть, скільки вам коштує <b>1 штука</b> товару: матеріали, друк, пакування. Дохід — це ціна, яку заплатив покупець, уже зі знижкою. Собівартість також додається до плиток «Витрати» й «Чистий прибуток».</div>
+  return [totalHTML + `<div class="tab-note" style="padding:0 2px 10px">Скільки вам коштує <b>1 штука</b> кожного товару — так видно маржу окремих товарів. Дохід — ціна, яку заплатив покупець, уже зі знижкою. Якщо вказали загальну суму вище, тут можна нічого не заповнювати — інакше собівартість порахується двічі.</div>
     <div id="mgSum">${sum()}</div><div class="lbl">Товари · ${esc(rangeLabel())}</div>${rows}`, () => {
-    $('sheet').querySelectorAll('.mg input').forEach(inp => inp.onchange = () => {
+    bindTotal();
+    $('sheet').querySelectorAll('.mg input[data-i]').forEach(inp => inp.onchange = () => {
       const x = list[+inp.dataset.i], raw = inp.value.trim(), v = raw === '' ? null : parseFloat(raw);
       x.shop.costs ||= {};
       if (v == null || isNaN(v) || v < 0) delete x.shop.costs[x.k]; else x.shop.costs[x.k] = Math.round(v * 100) / 100;
@@ -2108,13 +2204,13 @@ async function exportReport() {
   // KPI tiles (same numbers as on screen)
   const all = vis.flatMap(e => e.orders), agg = moneyAgg(all), withRv = all.filter(o => o.review);
   const tiles = [[$('kOrders').textContent, 'Замовлень'], [$('kRev').title || $('kRev').textContent, 'Дохід'], [$('kCities').textContent, 'Міст'], [$('kCountries').textContent, 'Країн'],
-    [agg.n ? fmtMoney(agg.v / agg.n, agg.cur) : '—', 'Середній чек'], [hasLedger() ? $('kCosts').title || $('kCosts').textContent : '—', 'Витрати'], [hasLedger() ? $('kProfit').title || $('kProfit').textContent : '—', 'Чистий прибуток'],
+    hasCogs() && $('kCogs').textContent !== '—' ? [$('kCogs').title || $('kCogs').textContent, 'Собівартість'] : [agg.n ? fmtMoney(agg.v / agg.n, agg.cur) : '—', 'Середній чек'], [hasLedger() ? $('kCosts').title || $('kCosts').textContent : '—', 'Витрати Etsy'], [hasLedger() ? $('kProfit').title || $('kProfit').textContent : '—', 'Чистий прибуток'],
     [withRv.length ? '★ ' + (withRv.reduce((t, o) => t + o.review.s, 0) / withRv.length).toFixed(1) : '—', 'Оцінка']];
   const tw = (S - 2*M - 3*16) / 4, th = 104;
   tiles.forEach(([v, l], i) => {
     const tx = M + (i % 4) * (tw + 16), ty = 156 + Math.floor(i / 4) * (th + 16);
     x.fillStyle = P.card; rr(tx, ty, tw, th, 22); x.fill();
-    x.fillStyle = l === 'Витрати' && v !== '—' ? '#e5484d' : l === 'Чистий прибуток' && v !== '—' ? (String(v).startsWith('-') ? '#e5484d' : '#1a9850') : l === 'Оцінка' && v !== '—' ? '#e0a800' : P.fg;
+    x.fillStyle = (l === 'Витрати Etsy' || l === 'Собівартість') && v !== '—' ? '#e5484d' : l === 'Чистий прибуток' && v !== '—' ? (String(v).startsWith('-') ? '#e5484d' : '#1a9850') : l === 'Оцінка' && v !== '—' ? '#e0a800' : P.fg;
     x.font = F(800, 34); x.textAlign = 'center'; x.fillText(fit(v, tw - 20), tx + tw/2, ty + 52);
     x.fillStyle = P.mut; x.font = F(600, 18); x.fillText(l.toUpperCase(), tx + tw/2, ty + 84);
   });
