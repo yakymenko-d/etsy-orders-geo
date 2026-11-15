@@ -190,6 +190,9 @@
   details.om tr.mut td { color:var(--muted); }
   details.om tr.sum td, details.om tr.tot td { font-weight:800; }
   details.om tr.tot td { border-top:2px solid var(--line); }
+  details.om .money-in.oc { background:var(--solid); }
+  details.om .money-in.oc input { width:64px; text-align:right; font-weight:650; color:var(--danger); }
+  details.om td small { max-width:220px; }
   .order .pr .disc { display:inline-block; margin-top:3px; font-size:11px; font-weight:700; color:var(--good); background:color-mix(in srgb, var(--good) 15%, transparent); padding:1px 7px; border-radius:99px; }
   .badge.rv { background:color-mix(in srgb, #e0a800 18%, transparent); color:#b98a00; cursor:help; }
   :root[data-theme="dark"] .badge.rv { color:#f0c34a; }
@@ -943,17 +946,22 @@ function ledgerEntries(b = rangeBounds()) {
 }
 // unit costs the seller entered per listing (Гроші → Собівартість), kept per shop
 const unitCost = (shop, it) => { const v = shop.costs?.[itemKey(it)]; return typeof v === 'number' && v >= 0 ? v : null; };
+const ownCost = o => typeof o.cost === 'number' && o.cost >= 0; // cost of goods typed in for this one order
 function cogsRows(entries) {
   const out = [];
-  entries.forEach(e => e.orders.forEach(o => itemsOf(o).forEach(it => { const c = unitCost(e.shop, it); if (c != null) out.push({ currency:o.currency || 'USD', v:c * (it.q || 1) }); })));
+  entries.forEach(e => e.orders.forEach(o => {
+    if (ownCost(o)) { out.push({ currency:o.currency || 'USD', v:o.cost }); return; }
+    itemsOf(o).forEach(it => { const c = unitCost(e.shop, it); if (c != null) out.push({ currency:o.currency || 'USD', v:c * (it.q || 1) }); });
+  }));
   return out;
 }
 // a total cost of goods for the whole shop (materials bought for all orders) is split evenly over all its orders,
 // so any period / filter gets its share: total × visible orders ÷ all orders
 const shopCogsTotal = s => s.cogsTotal?.v > 0 ? s.cogsTotal : null;
-const cogsPerOrder = s => { const t = shopCogsTotal(s), n = nOrders(s); return t && n ? t.v / n : 0; };
+// orders with their own cost are left out: the total is spread over the rest
+const cogsPerOrder = s => { const t = shopCogsTotal(s); if (!t) return 0; const n = s.places.reduce((k, p) => k + p.orders.filter(o => !ownCost(o)).length, 0); return n ? t.v / n : 0; };
 function cogsLumpRows(entries) {
-  const by = new Map(); entries.forEach(e => { if (shopCogsTotal(e.shop)) by.set(e.shop, (by.get(e.shop) || 0) + e.orders.length); });
+  const by = new Map(); entries.forEach(e => { if (shopCogsTotal(e.shop)) by.set(e.shop, (by.get(e.shop) || 0) + e.orders.filter(o => !ownCost(o)).length); });
   return [...by].map(([sh, n]) => ({ currency:sh.cogsTotal.cur || 'USD', v:cogsPerOrder(sh) * n }));
 }
 const hasCogs = () => shops.some(s => s.visible && (shopCogsTotal(s) || (s.costs && Object.keys(s.costs).length)));
@@ -1459,10 +1467,11 @@ function orderMoney(o, shop) {
   const cur = o.currency || 'USD', rows = (ledgerByOrder().get(o.id) || []).filter(r => (r.currency || 'USD') === cur);
   const lTax = rows.filter(isBuyerTax), tax = lTax.length ? Math.abs(lTax.reduce((t, r) => t + r.net, 0)) : (o.tax > 0 ? o.tax : 0);
   const fees = new Map(); rows.forEach(r => { if (r.cat === 'sale' || isBuyerTax(r)) return; fees.set(r.cat, (fees.get(r.cat) || 0) + r.net); });
-  const lump = shop && shopCogsTotal(shop) && (shop.cogsTotal.cur || 'USD') === cur ? cogsPerOrder(shop) : 0;
-  const cogs = lump + (shop ? itemsOf(o).reduce((t, it) => { const c = unitCost(shop, it); return c == null ? t : t + c * (it.q || 1); }, 0) : 0);
+  const own = ownCost(o), lump = !own && shop && shopCogsTotal(shop) && (shop.cogsTotal.cur || 'USD') === cur ? cogsPerOrder(shop) : 0;
+  const auto = lump + (shop ? itemsOf(o).reduce((t, it) => { const c = unitCost(shop, it); return c == null ? t : t + c * (it.q || 1); }, 0) : 0);
+  const cogs = own ? o.cost : auto;
   const revenue = o.total - tax, feeSum = [...fees.values()].reduce((t, v) => t + v, 0);
-  return { cur, total:o.total, tax, revenue, shipping:o.shipping, fees, feeSum, cogs, lump, left: revenue + feeSum - cogs, hasLedger: rows.length > 0 };
+  return { cur, total:o.total, tax, revenue, shipping:o.shipping, fees, feeSum, cogs, lump, own, auto, left: revenue + feeSum - cogs, hasLedger: rows.length > 0 };
 }
 function moneyHTML(o, shop) {
   const m = !viewOnly && orderMoney(o, shop); if (!m) return '';
@@ -1472,11 +1481,25 @@ function moneyHTML(o, shop) {
   t += line('= Ваш дохід', F(m.revenue), 'sum', m.shipping ? `з них доставка ${F(m.shipping)}` : '');
   if (m.hasLedger) [...m.fees].sort((a, b) => a[1] - b[1]).forEach(([c, v]) => { if (Math.abs(v) >= .005) t += line((v < 0 ? '− ' : '+ ') + esc(COST_CATS[c] || c), (v < 0 ? '−' : '+') + F(Math.abs(v)), v < 0 ? 'neg' : 'pos'); });
   else t += line('− Комісії Etsy', '?', 'mut', hasLedger() ? 'цього замовлення немає у завантажених виписках' : 'завантажте місячну виписку Etsy');
-  if (m.cogs) t += line('− Собівартість', '−' + F(m.cogs), 'neg', m.lump ? 'частка загальної суми собівартості' : '');
+  const cogsSub = m.own ? 'вписана для цього замовлення · очистіть поле, щоб повернути автоматичну' : m.lump ? 'частка загальної суми · впишіть свою' : m.auto ? 'за цінами товарів · впишіть свою' : 'впишіть, скільки коштував цей товар';
+  t += shop && o.id
+    ? `<tr class="${m.cogs ? 'neg' : 'mut'}"><td>− Собівартість<small>${cogsSub}</small></td><td><label class="money-in sm oc"><span>${esc(curSymbol(m.cur))}</span><input type="number" min="0" step="0.01" inputmode="decimal" data-ocost="${esc(shop.id)}|${esc(o.id)}" value="${m.own ? o.cost : ''}" placeholder="${m.auto ? m.auto.toFixed(2) : '0'}"></label></td></tr>`
+    : (m.cogs ? line('− Собівартість', '−' + F(m.cogs), 'neg', cogsSub) : '');
   t += line('= Вам лишилось', F(m.left), 'tot ' + (m.left >= 0 ? 'pos' : 'neg'));
   const short = m.hasLedger ? `комісії −${F(Math.abs(m.feeSum))}` : 'без комісій';
-  return `<details class="om"><summary><svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>Вам лишилось <b class="${m.left >= 0 ? 'pos' : 'neg'}">${F(m.left)}</b><span class="tail">${short}</span></summary><table>${t}</table></details>`;
+  return `<details class="om" data-oid="${esc(o.id || '')}"${o.id && openOm.has(o.id) ? ' open' : ''}><summary><svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>Вам лишилось <b class="${m.left >= 0 ? 'pos' : 'neg'}">${F(m.left)}</b><span class="tail">${short}</span></summary><table>${t}</table></details>`;
 }
+// opened breakdowns stay open across re-renders; typing a cost saves it on the order and recalculates everything
+const openOm = new Set();
+document.addEventListener('toggle', e => { const d = e.target; if (d.matches?.('details.om') && d.dataset.oid) d.open ? openOm.add(d.dataset.oid) : openOm.delete(d.dataset.oid); }, true);
+document.addEventListener('change', async e => {
+  const inp = e.target.closest?.('[data-ocost]'); if (!inp) return;
+  const [sid, oid] = inp.dataset.ocost.split('|'), sh = shopById(sid), o = sh?.places.flatMap(p => p.orders).find(x => x.id === oid); if (!o) return;
+  const v = inp.value.trim() === '' ? null : parseFloat(inp.value);
+  if (v == null || isNaN(v) || v < 0) delete o.cost; else o.cost = Math.round(v * 100) / 100;
+  openOm.add(oid); await saveData(sh);
+  const list = $('lsList'), y = list?.scrollTop; refresh(false); if (list && $('lsList')) $('lsList').scrollTop = y;
+});
 // order sum; with a discount: the sum without it struck through, the paid sum and the discount in % of the items' price
 function orderPriceHTML(o) {
   const disc = o.total != null ? orderDiscount(o) : 0;
