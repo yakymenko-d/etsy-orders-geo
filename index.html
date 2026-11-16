@@ -191,6 +191,9 @@
   details.om tr.sum td, details.om tr.tot td { font-weight:800; }
   details.om tr.tot td { border-top:2px solid var(--line); }
   details.om .money-in.oc { background:var(--solid); }
+  #pasteCosts { width:100%; resize:vertical; min-height:84px; padding:9px 11px; border-radius:11px; border:1px solid var(--line); background:var(--solid); color:var(--fg); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; outline:none; }
+  #pasteCosts:focus { border-color:var(--accent); }
+  .btn:disabled { opacity:.45; cursor:default; }
   details.om .money-in.oc input { width:64px; text-align:right; font-weight:650; color:var(--danger); }
   details.om td small { max-width:220px; }
   .order .pr .disc { display:inline-block; margin-top:3px; font-size:11px; font-weight:700; color:var(--good); background:color-mix(in srgb, var(--good) 15%, transparent); padding:1px 7px; border-radius:99px; }
@@ -1999,6 +2002,21 @@ function itemStats(entries) {
   })));
   return [...m.values()].sort((a,b) => b.rev - a.rev || b.units - a.units);
 }
+// a pasted column of numbers (Excel / Google Sheets): one value per line, empty line = skip;
+// "$1,234.56", "1 234,56" and "12,5" all work; with several columns only the first one is used
+let pasteShop = 0;
+function parseCostList(text) {
+  const lines = String(text || '').replace(/\r/g, '').split('\n');
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  return lines.map(l => {
+    let t = l.split('\t')[0].replace(/[^\d.,\-]/g, '');
+    if (!t) return null;
+    if (t.includes(',') && t.includes('.')) t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
+    else if (t.includes(',')) t = /,\d{1,2}$/.test(t) && (t.match(/,/g) || []).length === 1 ? t.replace(',', '.') : t.replace(/,/g, '');
+    const v = parseFloat(t); return isNaN(v) || v < 0 ? null : v;
+  });
+}
+const ordersByDate = sh => sh.places.flatMap(p => p.orders).slice().sort((a, b) => (Date.parse(a.date) || Infinity) - (Date.parse(b.date) || Infinity) || String(a.id).localeCompare(String(b.id)));
 function marginHTML() {
   const list = itemStats(visibleEntries()).slice(0, 150);
   // total cost of goods per visible shop (one sum for all orders)
@@ -2007,12 +2025,45 @@ function marginHTML() {
     <div class="tab-note" style="padding:0 2px 8px">Скільки ви всього витратили на матеріали, друк і пакування для всіх замовлень. Сума ділиться порівну на всі замовлення магазину, тож для будь-якого періоду віднімається його частка — у плитці «Собівартість» і в «Чистому прибутку».</div>
     ${vs.map((sh, i) => `<div class="mg"><div class="mid"><div class="tt"><span class="sn">${esc(sh.name)}</span></div><div class="mm">${nOrders(sh)} замовлень${shopCogsTotal(sh) && nOrders(sh) ? ` · ${esc(fmtMoney(cogsPerOrder(sh), curOf(sh)))} на замовлення` : ''}</div></div>
       <label class="money-in" title="Загальна собівартість"><span>${esc(curSymbol(curOf(sh)))}</span><input type="number" min="0" step="1" inputmode="decimal" data-tot="${i}" placeholder="напр. 500" value="${shopCogsTotal(sh) ? sh.cogsTotal.v : ''}" style="width:90px"></label></div>`).join('')}
+    <div class="lbl">Список по замовленнях (з Excel)</div>
+    <div class="tab-note" style="padding:0 2px 8px">Скопіюйте стовпчик із собівартістю в Excel чи Google Таблицях і вставте сюди. <b>Перше значення — найдавніше замовлення, останнє — найновіше.</b> Порожня клітинка — замовлення пропускається.</div>
+    ${vs.length > 1 ? `<div class="chips" style="margin-bottom:8px">${vs.map((sh, i) => `<button class="chip${i === pasteShop ? ' on' : ''}" data-pshop="${i}"><span class="sn">${esc(sh.name)}</span></button>`).join('')}</div>` : ''}
+    <textarea id="pasteCosts" rows="4" placeholder="12.50&#10;18&#10;9.75&#10;…" spellcheck="false"></textarea>
+    <div class="hint" id="pastePrev" style="margin:6px 2px 0"></div>
+    <div class="row" style="margin-top:8px"><button class="btn primary" id="pasteApply" disabled>Підставити</button><button class="link danger" id="pasteClear" title="Прибрати собівартість, вписану для окремих замовлень">Очистити вписані</button></div>
     <div class="lbl">Або по товарах — за 1 штуку</div>`;
-  const bindTotal = () => $('sheet').querySelectorAll('[data-tot]').forEach(inp => inp.onchange = () => {
+  const pasteTarget = () => vs[Math.min(pasteShop, vs.length - 1)];
+  const bindPaste = () => {
+    const ta = $('pasteCosts'); if (!ta) return;
+    $('sheet').querySelectorAll('[data-pshop]').forEach(b => b.onclick = () => { pasteShop = +b.dataset.pshop; renderMoney(); });
+    const preview = () => {
+      const sh = pasteTarget(), vals = parseCostList(ta.value), ord = ordersByDate(sh), n = Math.min(vals.length, ord.length), set = vals.slice(0, n).filter(v => v != null).length;
+      $('pasteApply').disabled = !set;
+      if (!vals.length) return $('pastePrev').textContent = `${ord.length} замовлень у «${sh.name}», від найдавнішого до найновішого.`;
+      const cur = ord[0]?.currency || 'USD', f = (v, o) => `${v == null ? 'пропуск' : fmtMoney(v, cur)} → #${o.id} (${fmtDate(o.date)})`;
+      const last = n - 1;
+      $('pastePrev').innerHTML = esc(`${vals.length} значень → ${ord.length} замовлень. Буде підставлено: ${set}.`)
+        + (n ? `<br>${esc('Перше: ' + f(vals[0], ord[0]))}${last > 0 ? `<br>${esc('Останнє: ' + f(vals[last], ord[last]))}` : ''}` : '')
+        + (vals.length !== ord.length ? `<br><b class="neg">${esc(vals.length > ord.length ? `Значень більше, ніж замовлень — зайві ${vals.length - ord.length} в кінці буде пропущено.` : `Значень менше, ніж замовлень — найновіші ${ord.length - vals.length} лишаться без змін.`)}</b>` : '');
+    };
+    ta.oninput = preview; preview();
+    $('pasteApply').onclick = async () => {
+      const sh = pasteTarget(), vals = parseCostList(ta.value), ord = ordersByDate(sh); let k = 0;
+      ord.forEach((o, i) => { const v = vals[i]; if (v != null && i < vals.length) { o.cost = Math.round(v * 100) / 100; k++; } });
+      await saveData(sh); ta.value = ''; refresh(false); toast(`Собівартість підставлено для ${k} замовлень «${sh.name}».`, 4000);
+    };
+    $('pasteClear').onclick = async () => {
+      const sh = pasteTarget(), ord = ordersByDate(sh), k = ord.filter(ownCost).length;
+      if (!k) return toast('Немає вписаної собівартості для окремих замовлень.', 3000);
+      if (!confirm(`Прибрати собівартість, вписану для ${k} замовлень «${sh.name}»? Для них знову рахуватиметься автоматично.`)) return;
+      ord.forEach(o => delete o.cost); await saveData(sh); refresh(false); toast(`Очищено ${k} замовлень.`, 3000);
+    };
+  };
+  const bindTotal = () => { bindPaste(); $('sheet').querySelectorAll('[data-tot]').forEach(inp => inp.onchange = () => {
     const sh = vs[+inp.dataset.tot], v = parseFloat(inp.value);
     if (!(v > 0)) delete sh.cogsTotal; else sh.cogsTotal = { v:Math.round(v * 100) / 100, cur:curOf(sh) };
     saveShops(); updateFinanceKPIs(compareBounds()); renderMoney();
-  });
+  }); };
   if (!list.length) return [totalHTML + '<div class="empty">Тут з\'являться товари з файлу «Sold Order Items». Для кожного можна вказати собівартість однієї штуки — і побачити реальний прибуток і маржу.</div>', bindTotal];
   const many = shops.filter(s => s.visible).length > 1;
   const res = x => { const c = unitCost(x.shop, x.it); if (c == null) return '<span class="muted">—</span>'; const pr = x.rev - c * x.units, mg = x.rev ? pr / x.rev : 0; return `<b class="${pr >= 0 ? 'pos' : 'neg'}">${pr >= 0 ? '+' : ''}${esc(fmtMoney(pr, x.cur))}</b><small>маржа ${Math.round(mg * 100)}%</small>`; };
